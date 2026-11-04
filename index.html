@@ -287,7 +287,14 @@ const COLORS=['#dc2626','#2563eb','#16a34a','#eab308','#9333ea','#ea580c','#0891
 const TK='intercentros10_token';
 const API_KEY='intercentros10_api';
 const URL_RE=/^https:\/\/script\.google\.com\/(a\/macros\/[^/]+\/|macros\/)s\/[\w-]+\/exec$/;
-function apiGet(){try{return localStorage.getItem(API_KEY)||''}catch(e){return ''}}
+/* ============================================================
+   URL DEL SERVIDOR DE DATOS PARA TODOS LOS DISPOSITIVOS
+   Pega entre las comillas la URL /exec de tu Apps Script.
+   Así cualquier equipo se conecta solo, sin pedirla.
+   ============================================================ */
+const SERVIDOR='';
+function apiStored(){try{return localStorage.getItem(API_KEY)||''}catch(e){return ''}}
+function apiGet(){return apiStored()||(URL_RE.test(SERVIDOR.trim())?SERVIDOR.trim():'')}
 function apiSet(u){try{u?localStorage.setItem(API_KEY,u):localStorage.removeItem(API_KEY)}catch(e){}}
 
 /* ---------- Conexión con el servidor de datos (Apps Script + Google Sheets) ---------- */
@@ -306,7 +313,7 @@ function run(fn,...a){const u=apiGet();return u?call(u,fn,...a):Promise.reject(n
 let LINK_CONFLICT=false;
 (function(){
  const q=new URLSearchParams(location.search),u=q.get('api');if(!u)return;
- if(URL_RE.test(u)&&!apiGet())apiSet(u);else if(apiGet()&&u!==apiGet())LINK_CONFLICT=true;
+ const st=apiStored();if(URL_RE.test(u)&&!st)apiSet(u);else if(st&&u!==st)LINK_CONFLICT=true;
  q.delete('api');try{history.replaceState(null,'',location.pathname+(q.toString()?'?'+q:'')+location.hash)}catch(e){}
 })();
 
@@ -909,6 +916,9 @@ function ServerSettings({server}){
    <h2 id={id+'s'}>Servidor de datos</h2>
    <p className="lead">Todos los dispositivos guardan y leen en esta aplicación web de Apps Script.</p>
    <p className="codebox">{server.url}</p>
+   {SERVIDOR.trim()===server.url
+    ?<p className="notice notice-ok"><Icon n="check" s={18}/>Esta URL está fijada en la app: cualquier dispositivo se conecta solo, sin pedirla.</p>
+    :<p className="notice notice-brand"><Icon n="info" s={18}/><span>Esta URL solo está guardada en los dispositivos donde se ha introducido o se ha abierto el enlace de acceso. Para que todos se conecten solos, pégala en la constante <b style={{fontWeight:600}}>SERVIDOR</b> al principio del archivo index.html y vuelve a publicarlo.</span></p>}
   </section>
   <section className="card stack-sm" aria-labelledby={id+'l'}>
    <h2 id={id+'l'}>Enlace de acceso para jueces y centros</h2>
