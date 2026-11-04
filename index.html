@@ -18,12 +18,13 @@
 body{font-family:Montserrat,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
 @keyframes rise{from{opacity:0;transform:tranneutralY(24px)}to{opacity:1;transform:none}}
 .rise{animation:rise .6s ease-out both}
+@media (max-width:640px){input,select,textarea{font-size:16px}}
 @media (prefers-reduced-motion:reduce){.rise{animation:none}}
 .card{transition:transform .15s}.card:active{transform:scale(.96)}
 @media (prefers-reduced-motion:reduce){.card{transition:none}}
 </style>
 </head>
-<body class="bg-neutral-100 text-neutral-900 dark:bg-black dark:text-neutral-100 min-h-screen">
+<body class="bg-green-50 text-neutral-900 dark:bg-black dark:text-neutral-100 min-h-screen">
 <div id="root"></div>
 <script type="text/babel">
 const {useState,useEffect,useRef}=React;
@@ -98,6 +99,8 @@ const isComplete=(db,k)=>{const m=db.scores[k]||{};return db.centers.length>0&&d
 const evDone=(db,e)=>keysOf(e).every(k=>isComplete(db,k));
 const isOpen=(db,i,role)=>role==='admin'||!db.settings.strictOrder||EVENTS.slice(0,i).every(e=>evDone(db,e));
 const allDone=db=>EVENTS.every(e=>evDone(db,e));
+const judgesOf=(db,e)=>(db.assignments||{})[e.id]||[];
+const canJudge=(db,e,role,me)=>role!=='juez'||!judgesOf(db,e).length||judgesOf(db,e).includes(me);
 function calc(db){
  const n=db.centers.length,tot={},per={};
  db.centers.forEach(c=>{tot[c.id]=0;per[c.id]={}});
@@ -132,14 +135,56 @@ function Logo({logo,cls='h-12'}){
  return logo?<img src={logo} alt="Logotipo" className={cls+' w-auto object-contain rounded'}/>:<div className={cls+' aspect-square grid place-items-center rounded-full bg-green-500 text-xl'}>🏆</div>;
 }
 
-function Header({logo,user,onOut,sync}){
+function Header({logo,user,onOut,sync,onHelp}){
  const lbl={saving:'⏳ Guardando…',ok:'☁️ Guardado en Sheets',err:'⚠️ Sin conexión'}[sync];
  return(<header className="sticky top-0 z-10 bg-black text-white px-4 py-3 flex items-center gap-3 shadow border-b-4" style={{borderImage:'linear-gradient(90deg,#7e22ce,#16a34a) 1'}}>
-  <Logo logo={logo}/>
-  <h1 className="font-extrabold text-base sm:text-xl leading-tight flex-1">INTERCENTROS 10° EDICIÓN</h1>
-  {user&&<span className="text-xs opacity-90 hidden sm:inline">{lbl}</span>}
-  {user&&<button onClick={()=>onOut()} className="text-sm bg-white/20 hover:bg-white/30 rounded-lg px-3 py-2">Salir</button>}
+  <Logo logo={logo} cls="h-10 sm:h-12"/>
+  <h1 className="font-extrabold text-sm sm:text-xl leading-tight flex-1 min-w-0">INTERCENTROS <span className="text-green-400">10° EDICIÓN</span></h1>
+  {user&&<span className="text-xs text-green-300 hidden md:inline">{lbl}</span>}
+  {user&&<span className="md:hidden" role="status" aria-label={lbl} title={lbl}>{lbl.split(' ')[0]}</span>}
+  <button onClick={onHelp} aria-label="Manual de usuario" title="Manual de usuario" className="shrink-0 w-10 h-10 grid place-items-center rounded-full bg-green-600 hover:bg-green-500 font-black text-lg">?</button>
+  {user&&<button onClick={()=>onOut()} className="shrink-0 text-sm bg-white/15 hover:bg-white/25 rounded-lg px-3 py-2">Salir</button>}
  </header>);
+}
+
+const MANUAL={
+ organizacion:{t:'Organización',s:[
+  ['Entrar','Usa el usuario y la contraseña de organización que te dé el administrador. Si es la primera vez en ese dispositivo, abre antes el enlace o el código QR de acceso.'],
+  ['Calendario','Pestaña Calendario. Con «+ Añadir actividad, descanso o acto» creas una fila nueva; cambia su nombre, fecha, horas y lugar. Puedes ordenar las filas con ▲ ▼. Para borrar una fila, pídeselo al administrador.'],
+  ['Centros nuevos','Pestaña Centros › «+ Añadir centro». Escribe el nombre, elige el color de su camiseta y dale un usuario y una contraseña para que pueda consultar sus resultados.'],
+  ['Jueces nuevos','Pestaña Jueces › «+ Añadir juez». Cámbiale el usuario y la contraseña y entrégaselos junto al enlace de acceso.'],
+  ['Asignar jueces','Pestaña Asignar jueces. En cada disciplina, toca el nombre de los jueces que la van a arbitrar (verde = asignado). Si una disciplina no tiene a nadie asignado, cualquier juez puede puntuarla.'],
+  ['Proyectar resultados','Pestaña Proyección › «Proyectar resultados». Se abre a pantalla completa y se actualiza sola. «Revelar podio» oculta el podio y lo descubre puesto a puesto (también con la barra espaciadora). Para salir, botón «Salir» arriba a la derecha o tecla Esc.'],
+  ['Guardado','Todo se guarda solo en la hoja de Google. Mira el indicador de la cabecera: ☁️ guardado, ⏳ guardando, ⚠️ sin conexión (no cierres la app hasta que vuelva a ☁️).']]},
+ juez:{t:'Jueces',s:[
+  ['Entrar','Abre el enlace o el código QR que te ha enviado la organización y entra con tu usuario y contraseña de juez.'],
+  ['Tus disciplinas','En la pantalla Disciplinas verás «Asignada a ti» en las que te tocan. 🔒 significa que todavía no se puede puntuar (faltan disciplinas anteriores) o que está asignada a otro juez.'],
+  ['Registrar resultados','Toca la disciplina, elige la categoría (Masculino, Femenino o Mixto) y, para cada centro, su posición final. Los puntos se calculan solos: 1º recibe tantos puntos como centros hay y el último, 1.'],
+  ['Empates y errores','Si repites una posición, aparece un aviso. Déjala solo si es un empate real. Puedes corregir cualquier posición mientras estés en la disciplina.'],
+  ['Guardado','No hay botón de guardar: cada cambio se guarda solo. Comprueba que la cabecera muestre ☁️ antes de pasar a otra cosa.'],
+  ['Siguiente disciplina','Cuando todas las categorías tienen las posiciones de todos los centros, aparece el botón para pasar a la siguiente disciplina.'],
+  ['Si algo falla','Si ves ⚠️ o un mensaje de error, revisa la conexión y vuelve a intentarlo. Si sigue, avisa a la organización.']]}
+};
+function Manual({role,onClose}){
+ const [t,setT]=useState(role==='juez'?'juez':'organizacion');
+ useEffect(()=>{const k=e=>e.key==='Escape'&&onClose();window.addEventListener('keydown',k);return()=>window.removeEventListener('keydown',k)},[]);
+ const m=MANUAL[t];
+ return(<div className="fixed inset-0 z-40 bg-black/60 flex items-end sm:items-center justify-center sm:p-4" onClick={onClose}>
+  <div role="dialog" aria-modal="true" aria-labelledby="manual-t" onClick={e=>e.stopPropagation()} className="bg-white dark:bg-neutral-900 w-full sm:max-w-2xl max-h-[92vh] overflow-auto rounded-t-2xl sm:rounded-2xl shadow-xl" style={{paddingBottom:'env(safe-area-inset-bottom,0px)'}}>
+   <div className="sticky top-0 bg-black text-white px-4 py-3 flex items-center gap-3 border-b-4" style={{borderImage:'linear-gradient(90deg,#7e22ce,#16a34a) 1'}}>
+    <span className="w-9 h-9 grid place-items-center rounded-full bg-green-600 font-black" aria-hidden="true">?</span>
+    <h2 id="manual-t" className="font-extrabold flex-1">Manual de usuario</h2>
+    <button onClick={onClose} className="text-sm bg-white/15 hover:bg-white/25 rounded-lg px-3 py-2">Cerrar</button>
+   </div>
+   <div className="p-4 space-y-4">
+    <div className="flex gap-2" role="tablist">{Object.entries(MANUAL).map(([k,v])=>(<button key={k} role="tab" aria-selected={t===k} onClick={()=>setT(k)} className={'flex-1 rounded-lg p-2 font-semibold '+(t===k?'bg-green-600 text-white':'bg-green-50 dark:bg-neutral-800 text-green-900 dark:text-green-300')}>{v.t}</button>))}</div>
+    <ol className="space-y-3">{m.s.map(([h,d],i)=>(<li key={h} className="flex gap-3">
+     <span className="shrink-0 w-7 h-7 grid place-items-center rounded-full bg-purple-700 text-white text-sm font-bold">{i+1}</span>
+     <div><h3 className="font-bold text-green-800 dark:text-green-400">{h}</h3><p className="text-sm text-neutral-700 dark:text-neutral-300">{d}</p></div>
+    </li>))}</ol>
+   </div>
+  </div>
+ </div>);
 }
 
 function Login({logo,onLogin}){
@@ -250,13 +295,14 @@ function Projection({db,onExit}){
  const top=[r[1],r[0],r[2]],place=[2,1,3],hgt=['h-[22vh]','h-[30vh]','h-[16vh]'],medal=['🥈','🥇','🥉'];
  const visible=pl=>shown>=4-pl; // se revela 3º, luego 2º y por último 1º
  return(<div ref={ref} className="fixed inset-0 z-50 bg-black text-white overflow-auto flex flex-col" style={{padding:'max(2vh, env(safe-area-inset-top,0px)) 3vw max(2vh, env(safe-area-inset-bottom,0px))'}}>
-  <div className="flex items-center gap-4 border-b-4 pb-3" style={{borderImage:'linear-gradient(90deg,#7e22ce,#16a34a) 1'}}>
+  <div className="flex flex-wrap items-center gap-3 sm:gap-4 border-b-4 pb-3" style={{borderImage:'linear-gradient(90deg,#7e22ce,#16a34a) 1'}}>
    <Logo logo={db.settings.logo} cls="h-[8vh]"/>
    <div className="flex-1"><h1 className="font-black tracking-tight" style={{fontSize:'clamp(1.5rem,3.6vw,3.5rem)'}}>INTERCENTROS 10° EDICIÓN</h1>
     <p className="font-semibold text-green-400" style={{fontSize:'clamp(.9rem,1.6vw,1.6rem)'}}>{done?'Resultados finales':'Clasificación provisional · '+fin+' de '+total+' pruebas'}</p></div>
+   <button onClick={onExit} className="self-start bg-white/10 hover:bg-white/25 border border-white/30 rounded-lg px-4 py-2 text-sm font-semibold">Salir ✕</button>
   </div>
   <div className="flex-1 flex items-end justify-center gap-[2vw] pt-[3vh]">
-   {top.map((c,i)=>c&&(<div key={c.id} className="flex flex-col items-center w-[22vw] max-w-xs">
+   {top.map((c,i)=>c&&(<div key={c.id} className="flex flex-col items-center w-[29vw] sm:w-[22vw] max-w-xs">
     {visible(place[i])?<div className="rise flex flex-col items-center">
      <Jersey color={c.color} size={Math.round(Math.min(window.innerWidth*.11,window.innerHeight*.16))}/>
      <span className="font-extrabold text-center mt-2 leading-tight" style={{fontSize:'clamp(1rem,2.2vw,2.4rem)'}}>{c.name}</span>
@@ -279,7 +325,6 @@ function Projection({db,onExit}){
   <div className="fixed bottom-3 right-3 flex gap-2 opacity-40 hover:opacity-100 focus-within:opacity-100 transition-opacity">
    {shown>=3?<button onClick={()=>setShown(0)} className="bg-purple-700 rounded-lg px-3 py-2 text-sm font-semibold">Revelar podio</button>
             :<button onClick={()=>setShown(v=>v+1)} className="bg-green-600 rounded-lg px-3 py-2 text-sm font-semibold">Mostrar {['3º','2º','1º'][shown]} puesto</button>}
-   <button onClick={onExit} className="bg-neutral-800 rounded-lg px-3 py-2 text-sm font-semibold">Salir</button>
   </div>
  </div>);
 }
@@ -288,7 +333,7 @@ function Podium({db}){
  const r=calc(db).slice(0,3);if(r.length<3)return null;
  const order=[r[1],r[0],r[2]],h=['h-20','h-28','h-16'],medal=['🥈','🥇','🥉'];
  return(<section className="bg-white dark:bg-neutral-900 rounded-2xl shadow p-4">
-  <h2 className="text-lg font-bold text-center">Podio final</h2>
+  <h2 className="text-lg font-bold text-green-800 dark:text-green-400 text-center">Podio final</h2>
   <div className="flex items-end justify-center gap-3 mt-3">
    {order.map((c,i)=>(<div key={c.id} className="flex flex-col items-center w-24">
     <Jersey color={c.color} size={48}/><span className="text-sm font-semibold text-center mt-1">{c.name}</span>
@@ -302,10 +347,10 @@ function Podium({db}){
 function Ranking({db,highlight,k}){
  const r=calc(db);
  return(<div className="space-y-2">
-  {r.map((c,i)=>(<div key={c.id} className={'flex items-center gap-3 rounded-xl p-3 bg-white dark:bg-neutral-900 shadow-sm '+(c.id===highlight?'ring-2 ring-purple-500':'')}>
+  {r.map((c,i)=>(<div key={c.id} className={'flex items-center gap-2 sm:gap-3 rounded-xl p-2 sm:p-3 bg-white dark:bg-neutral-900 shadow-sm border-l-4 '+(i<3?'border-green-500 ':'border-transparent ')+(c.id===highlight?'ring-2 ring-purple-500':'')}>
    <span className="w-8 text-center font-bold text-lg">{['🥇','🥈','🥉'][i]||i+1}</span>
    <Jersey color={c.color} size={40}/>
-   <span className="flex-1 font-medium">{c.name}</span>
+   <span className="flex-1 min-w-0 truncate font-medium">{c.name}</span>
    {k&&c.per[k]!=null&&<span className="text-xs font-semibold rounded-full bg-green-100 text-green-800 px-2 py-1">+{c.per[k]}</span>}
    <span className="font-extrabold text-purple-700 dark:text-purple-300">{c.total} pts</span>
   </div>))}
@@ -335,58 +380,64 @@ function Schedule({db}){
    const ev=EVENTS.find(e=>e.id===r.id),k=r.id+'-'+r.cat,m=db.scores[k]||{};
    const st=!ev?null:isComplete(db,k)?'Finalizada':Object.keys(m).length?'En juego':null;
    return(<li key={i} className={'flex items-center gap-3 rounded-xl p-3 shadow-sm '+(ev?'bg-white dark:bg-neutral-900':'bg-green-50 dark:bg-green-950/40')}>
-    <span className="w-24 shrink-0 text-sm font-semibold tabular-nums">{r.start}{r.end?'–'+r.end:''}</span>
+    <span className="w-20 sm:w-28 shrink-0 text-xs sm:text-sm font-semibold tabular-nums">{r.start}{r.end?'–'+r.end:''}</span>
     <span className="text-2xl" aria-hidden="true">{ev?ev.i:'🍖'}</span>
     <span className="flex-1 min-w-0"><span className="font-medium">{ev?ev.n:r.name}</span>{ev&&<span className="text-neutral-500"> ({CAT[r.cat]||r.cat})</span>}
-     {r.place&&<span className="block text-xs text-neutral-500 truncate">{r.place}</span>}</span>
+     {r.place&&<span className="block text-xs text-neutral-500 truncate">{r.place}</span>}
+     {ev&&judgesOf(db,ev).length>0&&<span className="block text-xs text-green-700 dark:text-green-400 truncate">Juez: {judgesOf(db,ev).join(', ')}</span>}</span>
     {st&&<span className={'text-xs rounded-full px-2 py-1 '+(st==='Finalizada'?'bg-green-100 text-green-800':'bg-purple-100 text-purple-900')}>{st}</span>}
    </li>)})}</ol>
  </section>))}</div>);
 }
 
-function Judge({db,api,role}){
+function Judge({db,api,role,me}){
  const [ev,setEv]=useState(null);const [cat,setCat]=useState(null);
  const n=db.centers.length;
  const open=e=>{setEv(e);setCat(e.c[0]);window.scrollTo(0,0)};
  if(!ev){
   const next=EVENTS.find(e=>!evDone(db,e));
-  return(<main className="p-4 max-w-3xl mx-auto">
+  const mine=EVENTS.filter(e=>judgesOf(db,e).includes(me));
+  return(<main className="p-3 sm:p-4 max-w-5xl mx-auto">
    {allDone(db)&&<div className="mb-4"><Podium db={db}/></div>}
-   <h2 className="text-lg font-bold mb-1">Disciplinas</h2>
+   {role==='juez'&&mine.length>0&&<p className="mb-3 rounded-xl bg-green-600 text-white p-3 text-sm font-medium">Tus disciplinas: {mine.map(e=>e.i+' '+e.n).join(' · ')}</p>}
+   <h2 className="text-lg font-bold text-green-800 dark:text-green-400 mb-1">Disciplinas</h2>
    {db.settings.strictOrder&&role!=='admin'&&<p className="text-sm text-neutral-500 mb-3">Los resultados se registran en orden. {next?'Ahora toca: '+next.i+' '+next.n+'.':'Todas las disciplinas están completas.'}</p>}
-   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-    {EVENTS.map((e,i)=>{const ok=isOpen(db,i,role);return(<button key={e.id} disabled={!ok} onClick={()=>open(e)} className={'card relative bg-white dark:bg-neutral-900 rounded-2xl shadow p-4 flex flex-col items-center gap-2 hover:ring-2 ring-purple-500 '+(ok?'':'opacity-50 cursor-not-allowed')}>
+   <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+    {EVENTS.map((e,i)=>{const js=judgesOf(db,e),own=js.includes(me),ok=isOpen(db,i,role)&&canJudge(db,e,role,me);return(<button key={e.id} disabled={!ok} onClick={()=>open(e)} className={'card relative bg-white dark:bg-neutral-900 rounded-2xl shadow p-4 flex flex-col items-center gap-2 hover:ring-2 ring-green-500 '+(own&&role==='juez'?'ring-2 ':'')+(ok?'':'opacity-50 cursor-not-allowed')}>
      <span className="text-4xl">{e.i}</span><span className="font-semibold text-sm">{e.n}</span>
      <span className="text-xs text-neutral-500">{e.c.join(' / ')}</span>
+     {js.length>0&&<span className={'text-[11px] rounded-full px-2 py-0.5 text-center '+(own?'bg-green-600 text-white':'bg-green-100 text-green-900')}>{own?'Asignada a ti':'Juez: '+js.join(', ')}</span>}
      {evDone(db,e)?<span className="absolute top-2 right-2 text-green-600" aria-label="Completada">✔</span>:!ok&&<span className="absolute top-2 right-2" aria-label="Bloqueada">🔒</span>}
     </button>)})}
    </div>
-   <h2 className="text-lg font-bold mt-6 mb-2">Clasificación general</h2><Ranking db={db}/>
-   <h2 className="text-lg font-bold mt-6 mb-2">Calendario</h2><Schedule db={db}/>
+   <div className="grid lg:grid-cols-2 gap-6 mt-6">
+    <section><h2 className="text-lg font-bold text-green-800 dark:text-green-400 mb-2">Clasificación general</h2><Ranking db={db}/></section>
+    <section><h2 className="text-lg font-bold text-green-800 dark:text-green-400 mb-2">Calendario</h2><Schedule db={db}/></section>
+   </div>
   </main>);
  }
  const key=ev.id+'-'+cat,pos=db.scores[key]||{};
  const setPos=(cid,v)=>{const m={...pos};if(!v)delete m[cid];else m[cid]=+v;api.scores(key,m)};
  const vals=Object.values(pos),dup=[...new Set(vals.filter((v,i)=>vals.indexOf(v)!==i))];
  const idx=EVENTS.indexOf(ev),nxt=EVENTS[idx+1];
- return(<main className="p-4 max-w-xl mx-auto space-y-3">
-  <button onClick={()=>setEv(null)} className="text-purple-600 dark:text-purple-300 text-sm">← Disciplinas</button>
+ return(<main className="p-3 sm:p-4 max-w-2xl mx-auto space-y-3">
+  <button onClick={()=>setEv(null)} className="text-green-700 dark:text-green-400 text-sm font-semibold">← Disciplinas</button>
   <h2 className="text-xl font-bold">{ev.i} {ev.n}</h2>
-  <div className="flex gap-2">{ev.c.map(c=>(<button key={c} onClick={()=>setCat(c)} className={'flex-1 rounded-lg p-2 font-medium '+(c===cat?'bg-purple-600 text-white':'bg-white dark:bg-neutral-900')}>{CAT[c]}{isComplete(db,ev.id+'-'+c)?' ✔':''}</button>))}</div>
+  <div className="flex gap-2">{ev.c.map(c=>(<button key={c} onClick={()=>setCat(c)} className={'flex-1 rounded-lg p-2 font-medium '+(c===cat?'bg-green-600 text-white':'bg-white dark:bg-neutral-900')}>{CAT[c]}{isComplete(db,ev.id+'-'+c)?' ✔':''}</button>))}</div>
   <p className="text-sm text-neutral-500">Elige la posición final de cada centro. Los puntos se calculan solos: 1º = {n} pts, último = 1 pt · {vals.length}/{n} registrados</p>
   {dup.length>0&&<p className="text-sm rounded-lg bg-purple-100 text-purple-900 p-2">Posiciones repetidas: {dup.sort((a,b)=>a-b).map(d=>d+'º').join(', ')}. Corrígelas salvo que sea un empate.</p>}
-  {db.centers.map(c=>(<div key={c.id} className="flex items-center gap-3 bg-white dark:bg-neutral-900 rounded-xl p-3 shadow-sm">
-   <Jersey color={c.color} size={40}/><span className="flex-1">{c.name}</span>
-   <select value={pos[c.id]||''} onChange={e=>setPos(c.id,e.target.value)} aria-label={'Posición de '+c.name} className="w-32 text-center font-bold rounded-lg border p-2 bg-transparent dark:bg-neutral-900">
+  {db.centers.map(c=>(<div key={c.id} className="flex items-center gap-2 sm:gap-3 bg-white dark:bg-neutral-900 rounded-xl p-2 sm:p-3 shadow-sm">
+   <Jersey color={c.color} size={40}/><span className="flex-1 min-w-0 truncate">{c.name}</span>
+   <select value={pos[c.id]||''} onChange={e=>setPos(c.id,e.target.value)} aria-label={'Posición de '+c.name} className="w-28 sm:w-36 shrink-0 text-center font-bold rounded-lg border p-2 bg-transparent dark:bg-neutral-900">
     <option value="">Posición</option>
     {Array.from({length:n},(_,i)=>i+1).map(p=>(<option key={p} value={p}>{p}º · {ptsFor(n,p)} pts</option>))}
    </select></div>))}
-  {evDone(db,ev)&&<div className="rounded-xl bg-green-100 text-green-900 p-3 flex items-center gap-3">
+  {evDone(db,ev)&&<div className="rounded-xl bg-green-100 text-green-900 p-3 flex flex-wrap items-center gap-3">
    <span className="flex-1 text-sm font-medium">{ev.n} completada.</span>
    {nxt?<button onClick={()=>open(nxt)} className="bg-green-700 text-white rounded-lg px-3 py-2 text-sm">Siguiente: {nxt.i} {nxt.n}</button>
        :<button onClick={()=>setEv(null)} className="bg-green-700 text-white rounded-lg px-3 py-2 text-sm">Ver podio final</button>}
   </div>}
-  <h2 className="text-lg font-bold pt-4">Clasificación general <span className="text-xs font-normal text-neutral-500">(+ puntos de esta prueba)</span></h2><Ranking db={db} k={key}/>
+  <h2 className="text-lg font-bold text-green-800 dark:text-green-400 pt-4">Clasificación general <span className="text-xs font-normal text-neutral-500">(+ puntos de esta prueba)</span></h2><Ranking db={db} k={key}/>
  </main>);
 }
 
@@ -398,16 +449,17 @@ function Admin({db,api,server,role='admin'}){
  const del=id=>{if(confirm('¿Eliminar este centro?'))api.centers(db.centers.filter(c=>c.id!==id))};
  const onFile=e=>compressLogo(e.target.files[0],url=>api.settings({logo:url}));
  const tabs=isAdmin
-  ?[['calendario','Calendario'],['centros','Centros'],['jueces','Jueces'],['puntuar','Puntuar'],['ranking','Clasificación'],['proyeccion','Proyección'],['organizacion','Organización'],['logo','Logotipo'],['ajustes','Ajustes']]
-  :[['calendario','Calendario'],['centros','Centros'],['jueces','Jueces'],['ranking','Clasificación'],['proyeccion','Proyección']];
- return(<main className="p-4 max-w-3xl mx-auto space-y-4">
-  <div className="flex gap-2 overflow-x-auto pb-1">{tabs.map(([k,l])=>(<button key={k} onClick={()=>setTab(k)} className={'px-4 py-2 rounded-lg whitespace-nowrap '+(tab===k?'bg-purple-600 text-white':'bg-white dark:bg-neutral-900')}>{l}</button>))}</div>
+  ?[['calendario','Calendario'],['centros','Centros'],['jueces','Jueces'],['asignacion','Asignar jueces'],['puntuar','Puntuar'],['ranking','Clasificación'],['proyeccion','Proyección'],['organizacion','Organización'],['logo','Logotipo'],['ajustes','Ajustes']]
+  :[['calendario','Calendario'],['centros','Centros'],['jueces','Jueces'],['asignacion','Asignar jueces'],['ranking','Clasificación'],['proyeccion','Proyección']];
+ return(<main className="p-3 sm:p-4 max-w-5xl mx-auto space-y-4">
+  <div className="flex gap-2 overflow-x-auto md:flex-wrap pb-1 -mx-3 px-3 sm:mx-0 sm:px-0">{tabs.map(([k,l])=>(<button key={k} onClick={()=>setTab(k)} className={'px-4 py-2 rounded-lg whitespace-nowrap '+(tab===k?'bg-green-600 text-white shadow':'bg-white dark:bg-neutral-900 hover:bg-green-100 dark:hover:bg-green-950')}>{l}</button>))}</div>
   {!isAdmin&&<p className="text-sm text-neutral-500">Panel de organización: puedes añadir y editar actividades, centros y jueces. Para eliminar algo, pídeselo al administrador.</p>}
   {projecting&&<Projection db={db} onExit={()=>setProjecting(false)}/>}
+  {tab==='asignacion'&&<Assignments db={db} api={api}/>}
   {tab==='calendario'&&<CalendarEditor db={db} api={api} canDelete={isAdmin}/>}
   {tab==='centros'&&<div className="space-y-3">
    {isAdmin&&<button onClick={()=>api.settings({centersReady:false})} className="w-full bg-white dark:bg-neutral-900 rounded-lg p-3 font-medium shadow-sm">Abrir el asistente de centros y camisetas</button>}
-   {db.centers.map(c=>(<div key={c.id} className="bg-white dark:bg-neutral-900 rounded-xl p-3 shadow-sm space-y-2">
+   <div className="grid gap-3 md:grid-cols-2">{db.centers.map(c=>(<div key={c.id} className="bg-white dark:bg-neutral-900 rounded-xl p-3 shadow-sm space-y-2 border-t-4 border-green-500">
     <div className="flex items-center gap-3"><Jersey color={c.color} size={48}/>
      <input value={c.name} onChange={e=>upd(c.id,{name:e.target.value})} aria-label="Nombre del centro" className="flex-1 min-w-0 rounded-lg border p-2 bg-transparent"/>
      <input type="color" value={c.color} onChange={e=>upd(c.id,{color:e.target.value})} className="w-11 h-11 rounded cursor-pointer" aria-label="Color de camiseta"/></div>
@@ -415,17 +467,17 @@ function Admin({db,api,server,role='admin'}){
      <input value={c.user} onChange={e=>upd(c.id,{user:e.target.value})} placeholder="Usuario" aria-label="Usuario" className="rounded-lg border p-2 bg-transparent min-w-0"/>
      <input value={c.pass} onChange={e=>upd(c.id,{pass:e.target.value})} placeholder="Contraseña" aria-label="Contraseña" className="rounded-lg border p-2 bg-transparent min-w-0"/></div>
     {isAdmin&&<button onClick={()=>del(c.id)} className="text-red-600 text-sm">Eliminar centro</button>}
-   </div>))}
+   </div>))}</div>
    <button onClick={add} className="w-full bg-green-600 text-white rounded-lg p-3 font-semibold">+ Añadir centro</button>
   </div>}
   {tab==='jueces'&&<div className="space-y-3">
    <p className="text-sm text-neutral-500">Cada juez entra con su usuario y puede registrar resultados desde su móvil.</p>
-   {(db.judges||[]).map((j,i)=>(<div key={i} className="bg-white dark:bg-neutral-900 rounded-xl p-3 shadow-sm flex gap-2 items-center">
+   <div className="grid gap-3 md:grid-cols-2">{(db.judges||[]).map((j,i)=>(<div key={i} className="bg-white dark:bg-neutral-900 rounded-xl p-3 shadow-sm flex gap-2 items-center">
     <span aria-hidden="true">🧑‍⚖️</span>
     <input value={j.user} onChange={e=>api.judges(db.judges.map((x,k)=>k===i?{...x,user:e.target.value}:x))} placeholder="Usuario" aria-label="Usuario del juez" className="flex-1 min-w-0 rounded-lg border p-2 bg-transparent"/>
     <input value={j.pass} onChange={e=>api.judges(db.judges.map((x,k)=>k===i?{...x,pass:e.target.value}:x))} placeholder="Contraseña" aria-label="Contraseña del juez" className="flex-1 min-w-0 rounded-lg border p-2 bg-transparent"/>
     {isAdmin&&<button onClick={()=>confirm('¿Eliminar este juez?')&&api.judges(db.judges.filter((_,k)=>k!==i))} className="text-red-600 text-sm px-2" aria-label="Eliminar juez">✕</button>}
-   </div>))}
+   </div>))}</div>
    <button onClick={()=>api.judges([...(db.judges||[]),{user:'juez'+((db.judges||[]).length+1),pass:'juez123'}])} className="w-full bg-green-600 text-white rounded-lg p-3 font-semibold">+ Añadir juez</button>
   </div>}
   {tab==='puntuar'&&<Judge db={db} api={api} role="admin"/>}
@@ -503,6 +555,20 @@ function CentersSetup({db,api}){
  </main>);
 }
 
+function Assignments({db,api}){
+ const js=(db.judges||[]).map(j=>j.user).filter(Boolean),a=db.assignments||{};
+ const toggle=(e,u)=>{const cur=a[e.id]||[];api.assignments({...a,[e.id]:cur.includes(u)?cur.filter(x=>x!==u):[...cur,u]})};
+ if(!js.length)return <p className="text-sm text-neutral-500">Añade primero jueces en la pestaña Jueces.</p>;
+ return(<div className="space-y-3">
+  <p className="text-sm text-neutral-600 dark:text-neutral-400">Toca el nombre de los jueces que arbitran cada disciplina. Solo ellos podrán registrar sus resultados. Si una disciplina no tiene a nadie asignado, puede puntuarla cualquier juez.</p>
+  <div className="grid gap-3 md:grid-cols-2">{EVENTS.map(e=>{const cur=a[e.id]||[];return(<section key={e.id} className="bg-white dark:bg-neutral-900 rounded-xl p-3 shadow-sm border-l-4 border-green-500 space-y-2">
+   <h3 className="font-bold flex items-center gap-2"><span className="text-2xl" aria-hidden="true">{e.i}</span>{e.n}<span className="text-xs font-normal text-neutral-500">{e.c.join(' / ')}</span></h3>
+   <div className="flex flex-wrap gap-2">{js.map(u=>{const on=cur.includes(u);return(<button key={u} onClick={()=>toggle(e,u)} aria-pressed={on} className={'rounded-full px-3 py-1.5 text-sm font-medium border '+(on?'bg-green-600 border-green-600 text-white':'border-neutral-300 dark:border-neutral-700 hover:border-green-500')}>{on?'✓ ':''}{u}</button>)})}</div>
+   <p className="text-xs text-neutral-500">{cur.filter(u=>js.includes(u)).length?'Asignada a: '+cur.filter(u=>js.includes(u)).join(', '):'Sin juez asignado: puede puntuarla cualquier juez.'}</p>
+  </section>)})}</div>
+ </div>);
+}
+
 function CalendarEditor({db,api,canDelete=true}){
  const rows=db.calendar||[];const [day,setDay]=useState('');
  const set=(i,p)=>api.calendar(rows.map((r,k)=>k===i?{...r,...p}:r));
@@ -554,18 +620,22 @@ function Settings({db,api,server}){
 }
 
 function Centro({db,id}){
- return(<main className="p-4 max-w-2xl mx-auto space-y-4">
+ return(<main className="p-3 sm:p-4 max-w-5xl mx-auto space-y-4">
   {allDone(db)&&<Podium db={db}/>}
-  <h2 className="text-lg font-bold">Clasificación general</h2><Ranking db={db} highlight={id}/>
-  <h2 className="text-lg font-bold">Tu rendimiento por disciplina</h2><Detail db={db} id={id}/>
-  <h2 className="text-lg font-bold">Calendario</h2><Schedule db={db}/>
+  <div className="grid lg:grid-cols-2 gap-6">
+   <section className="space-y-2"><h2 className="text-lg font-bold text-green-800 dark:text-green-400">Clasificación general</h2><Ranking db={db} highlight={id}/></section>
+   <div className="space-y-6">
+    <section className="space-y-2"><h2 className="text-lg font-bold text-green-800 dark:text-green-400">Tu rendimiento por disciplina</h2><Detail db={db} id={id}/></section>
+    <section className="space-y-2"><h2 className="text-lg font-bold text-green-800 dark:text-green-400">Calendario</h2><Schedule db={db}/></section>
+   </div>
+  </div>
  </main>);
 }
 
 function App(){
  const [pub,setPub]=useState({logo:null});const [apiUrl,setApiUrl]=useState(apiGet());
  const [db,setDb]=useState(null);const [user,setUser]=useState(null);
- const [sync,setSync]=useState('ok');const [toast,setToast]=useState('');const [boot,setBoot]=useState(true);
+ const [sync,setSync]=useState('ok');const [help,setHelp]=useState(false);const [toast,setToast]=useState('');const [boot,setBoot]=useState(true);
  const tok=useRef(tokGet()),ver=useRef(0);
  const apply=r=>{ver.current=r.state.version;setDb(r.state);setUser(r.session)};
  const logout=m=>{if(tok.current)run('logout',tok.current).catch(()=>{});tok.current=null;tokSet(null);setUser(null);setDb(null);ver.current=0;if(m)setToast(m)};
@@ -599,6 +669,7 @@ function App(){
   scores:(k,m)=>{setDb(d=>({...d,scores:{...d.scores,[k]:m}}));save('scores:'+k,'saveScores',k,m)},
   centers:l=>{setDb(d=>({...d,centers:l}));save('centers','saveCenters',l)},
   judges:l=>{setDb(d=>({...d,judges:l}));save('judges','saveJudges',l)},
+  assignments:m=>{setDb(d=>({...d,assignments:m}));save('assignments','saveAssignments',m)},
   orgs:l=>{setDb(d=>({...d,orgs:l}));save('orgs','saveOrgs',l)},
   calendar:l=>{setDb(d=>({...d,calendar:l}));save('calendar','saveCalendar',l)},
   settings:p=>{
@@ -612,13 +683,14 @@ function App(){
  const server={url:apiUrl,token:()=>tok.current,onSwitch:v=>{connected(v);setToast('Conectado al nuevo servidor de datos.')}};
  const logo=db?db.settings.logo:pub.logo;
  return(<LogoCtx.Provider value={logo}>
-  <Header logo={logo} user={user} sync={sync} onOut={()=>logout()}/>
+  <Header logo={logo} user={user} sync={sync} onOut={()=>logout()} onHelp={()=>setHelp(true)}/>
+  {help&&<Manual role={user&&user.role} onClose={()=>setHelp(false)}/>}
   {boot?<p className="text-center text-neutral-500 mt-12" role="status">Conectando con la hoja de Google…</p>:<>
    {!apiUrl&&<Connect logo={logo} onDone={connected}/>}
    {apiUrl&&!user&&<Login logo={logo} onLogin={r=>{tok.current=r.token;tokSet(r.token);apply(r)}}/>}
    {user&&db&&user.role==='admin'&&(db.settings.centersReady?<Admin db={db} api={api} server={server}/>:<CentersSetup db={db} api={api}/>)}
    {user&&db&&user.role==='organizacion'&&<Admin db={db} api={api} server={server} role="organizacion"/>}
-   {user&&db&&user.role==='juez'&&<Judge db={db} api={api} role="juez"/>}
+   {user&&db&&user.role==='juez'&&<Judge db={db} api={api} role="juez" me={user.user}/>}
    {user&&db&&user.role==='centro'&&<Centro db={db} id={user.id}/>}
   </>}
   {toast&&<div role="status" className="fixed left-1/2 -tranneutral-x-1/2 z-20 max-w-sm w-[90%] rounded-xl bg-neutral-900 text-white text-sm p-3 shadow-lg" style={{bottom:'calc(1rem + env(safe-area-inset-bottom,0px))'}}>{toast}</div>}

@@ -25,17 +25,18 @@ const EVENTS = [
 const CATN = {M:'Masculino', F:'Femenino', Mixto:'Mixto'};
 const COLORS = ['#dc2626','#2563eb','#16a34a','#eab308','#9333ea','#ea580c','#0891b2','#db2777','#65a30d','#0d9488','#4f46e5','#475569'];
 
-const SH = {CONFIG:'Config', CENTROS:'Centros', JUECES:'Jueces', ORG:'Organización', CAL:'Calendario', PUNT:'Puntuaciones', CLAS:'Clasificación', REG:'Registro'};
+const SH = {CONFIG:'Config', CENTROS:'Centros', JUECES:'Jueces', ORG:'Organización', ASIG:'Asignaciones', CAL:'Calendario', PUNT:'Puntuaciones', CLAS:'Clasificación', REG:'Registro'};
 const HEAD = {
   'Config':       ['clave','valor'],
   'Centros':      ['id','nombre','color','usuario','contraseña'],
   'Jueces':       ['usuario','contraseña'],
   'Organización': ['usuario','contraseña'],
+  'Asignaciones': ['disciplina_id','disciplina','juez'],
   'Calendario':   ['disciplina_id','actividad','categoría','fecha','inicio','fin','lugar'],
   'Puntuaciones': ['prueba','disciplina','categoría','centro_id','centro','posición','puntos','registrado_por','actualizado'],
   'Registro':     ['fecha','usuario','rol','acción','detalle']
 };
-const TEXT_SHEETS = ['Config','Centros','Jueces','Organización','Calendario'];
+const TEXT_SHEETS = ['Config','Centros','Jueces','Organización','Asignaciones','Calendario'];
 const SESSION_TTL = 21600; // 6 h
 const ERR_SESSION = {error:'Tu sesión ha caducado. Vuelve a entrar.', code:'session'};
 
@@ -65,7 +66,7 @@ const URL_RE = /^https:\/\/script\.google\.com\/(a\/macros\/[^\/]+\/|macros\/)s\
 
 // Funciones que la app puede llamar
 const API = {getPublic: getPublic, login: login, logout: logout, getState: getState, saveScores: saveScores,
-  saveCenters: saveCenters, saveJudges: saveJudges, saveOrgs: saveOrgs, saveCalendar: saveCalendar, saveSettings: saveSettings, resetScores: resetScores};
+  saveCenters: saveCenters, saveJudges: saveJudges, saveOrgs: saveOrgs, saveAssignments: saveAssignments, saveCalendar: saveCalendar, saveSettings: saveSettings, resetScores: resetScores};
 
 function json(o) {
   return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON);
@@ -204,6 +205,15 @@ function judges(s) {
 function orgs(s) {
   return rows(s, SH.ORG).filter(r => r[0] !== '').map(r => ({user: str(r[0]).trim(), pass: str(r[1])}));
 }
+// Jueces asignados a cada disciplina: {f7:['juez1'], vo:['juez2','juez3'], ...}
+function assignments(s) {
+  const m = {};
+  rows(s, SH.ASIG).forEach(r => {
+    const id = str(r[0]), u = str(r[2]).trim();
+    if (id && u) (m[id] = m[id] || []).push(u);
+  });
+  return m;
+}
 function calendar(s) {
   return rows(s, SH.CAL).filter(r => r.join('') !== '').map(r => ({
     id: str(r[0]), name: str(r[1]), cat: str(r[2]), date: str(r[3], 'yyyy-MM-dd'),
@@ -271,6 +281,7 @@ function state(s, info) {
     version: ver()
   };
   if (staff) st.judges = judges(s);
+  if (info.role !== 'centro') st.assignments = assignments(s);
   if (info.role === 'admin') {
     st.orgs = orgs(s);
     st.admin = {user: c.admin_usuario || '', pass: c.admin_contraseña || ''};
@@ -328,6 +339,9 @@ function saveScores(t, key, map) {
   if (!ev || ev.c.indexOf(parts[1]) < 0) return {error:'Prueba desconocida.'};
   return locked(() => {
     const s = ss(), cs = centers(s), sc = scores(s);
+    const asg = assignments(s)[ev.id] || [];
+    if (info.role === 'juez' && asg.length && asg.indexOf(info.user) < 0)
+      return {error:'Esta disciplina está asignada a otro juez (' + asg.join(', ') + ').'};
     if (info.role !== 'admin' && yes(cfgAll(s).orden_estricto) && !isOpen(i, cs, sc))
       return {error:'Esta disciplina aún no está abierta: termina antes las anteriores.'};
     const n = cs.length, names = {};
@@ -380,6 +394,19 @@ function saveOrgs(t, list) {
     const data = (list || []).map(o => [String(o.user || '').trim(), String(o.pass || '')]);
     writeRows(s, SH.ORG, data);
     log(s, info, 'Usuarios de organización actualizados', data.length + ' usuarios');
+    return {ok:true, version: bump()};
+  });
+}
+
+function saveAssignments(t, map) {
+  return asStaff(t, (s, info) => {
+    const valid = judges(s).map(j => j.user), data = [];
+    EVENTS.forEach(e => {
+      const us = ((map || {})[e.id] || []).map(u => String(u).trim());
+      us.filter((u, k) => valid.indexOf(u) >= 0 && us.indexOf(u) === k).forEach(u => data.push([e.id, e.n, u]));
+    });
+    writeRows(s, SH.ASIG, data);
+    log(s, info, 'Asignación de jueces', data.map(r => r[1] + ': ' + r[2]).join(' · ') || 'Sin asignaciones');
     return {ok:true, version: bump()};
   });
 }
