@@ -4,6 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#000000">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="Intercentros">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <title>INTERCENTROS 10° EDICIÓN · Plasencia 2027</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -260,6 +267,48 @@ details li+li{margin-top:4px}
 .reveal{animation:rise 300ms var(--ease-out) both}
 @keyframes rise{from{opacity:0;transform:translateY(8px)}}
 
+
+/* ===== Móvil ===== */
+html{-webkit-text-size-adjust:100%}
+*{-webkit-tap-highlight-color:transparent}
+button,a,label,select,input{touch-action:manipulation}
+@media (max-width:767px){.hide-m{display:none!important}}
+.tabbar{position:fixed;left:0;right:0;bottom:0;z-index:30;display:flex;gap:4px;background:var(--surface);border-top:1px solid var(--border);padding:4px 8px calc(4px + env(safe-area-inset-bottom,0px))}
+.tabbar button{flex:1;min-width:0;min-height:56px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;border:0;background:none;color:var(--muted);font-size:12px;font-weight:500;line-height:1.2;cursor:pointer;border-radius:var(--r-md)}
+.tabbar button span{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tabbar button .ic{box-sizing:content-box;padding:4px 16px;border-radius:16px;transition:background-color 150ms ease-out}
+.tabbar button[aria-current=page]{color:var(--accent-text)}
+.tabbar button[aria-current=page] .ic{background:var(--accent-soft)}
+body:has(.tabbar) main{padding-bottom:calc(96px + env(safe-area-inset-bottom,0px))}
+body:has(.tabbar) .toast{bottom:calc(84px + env(safe-area-inset-bottom,0px))}
+.re{padding:16px}
+.re-head{display:flex;align-items:center;gap:12px}
+.re-body{margin-top:12px}
+.jersey-pick{position:relative;flex:none;width:56px;height:56px;display:grid;place-items:center;border-radius:var(--r-md);cursor:pointer}
+.jersey-pick:hover{background:var(--hover)}
+.jersey-pick:focus-within{outline:2px solid var(--accent);outline-offset:2px}
+.jersey-pick input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;border:0;padding:0}
+.pos-val{display:flex;flex-direction:column;align-items:flex-end;line-height:1.25;white-space:nowrap}
+.pos-val b{font-weight:600}
+.pos-val span{font-size:12px;color:var(--muted)}
+.pgrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:12px 0}
+@media (min-width:768px){.pgrid{grid-template-columns:repeat(6,minmax(0,1fr))}}
+.pbtn{min-height:64px;border:1px solid var(--border-strong);border-radius:var(--r-md);background:var(--surface);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;cursor:pointer;transition:background-color 150ms ease-out,border-color 150ms ease-out}
+.pbtn:hover{border-color:var(--accent)}
+.pbtn .pn{font-size:20px;font-weight:600;line-height:1.1}
+.pbtn .pp{font-size:12px;color:var(--muted)}
+.pbtn.taken{border-style:dashed;background:var(--surface-2)}
+.pbtn.taken .pn{color:var(--muted)}
+.pbtn.on{background:var(--accent);border-color:var(--accent);border-style:solid;color:var(--on-accent)}
+.pbtn.on .pn,.pbtn.on .pp{color:var(--on-accent)}
+.sheet-who{display:flex;align-items:center;gap:12px;padding:16px 12px 16px 24px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface);z-index:1}
+.sheet-who h2{font-size:20px}
+@media (max-width:767px){
+ .hdr-in{gap:8px;padding:8px 8px 8px 16px;min-height:56px}
+ .ph h1{font-size:25px}
+ .page{padding:16px 16px 24px}
+}
+
 @media (prefers-reduced-motion:reduce){
  *,*::before,*::after{transition-duration:0ms!important;animation:none!important}
  .reveal,.dialog,.toast,.scrim{animation:fade 100ms ease-out!important}
@@ -395,7 +444,8 @@ const IC={
  expand:<><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></>,
  eye:<><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></>,
  info:<><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></>,
- play:<path d="m6 3 14 9-14 9V3z"/>
+ play:<path d="m6 3 14 9-14 9V3z"/>,
+ more:<><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></>
 };
 function Icon({n,s=20,cls=''}){
  return <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className={'ic '+cls}>{IC[n]}</svg>;
@@ -404,6 +454,18 @@ function Icon({n,s=20,cls=''}){
 function IconBtn({icon,label,onClick,danger,up,cls=''}){
  return(<button type="button" className={'icon-btn'+(danger?' danger':'')+(up?' tip-up':'')+(cls?' '+cls:'')} aria-label={label} onClick={onClick}>
   <Icon n={icon}/><span className="tip" aria-hidden="true">{label}</span></button>);
+}
+function useMobile(){
+ const q='(max-width: 767px)';const [m,setM]=useState(()=>window.matchMedia(q).matches);
+ useEffect(()=>{const mq=window.matchMedia(q),f=()=>setM(mq.matches);
+  mq.addEventListener?mq.addEventListener('change',f):mq.addListener(f);
+  return()=>{mq.removeEventListener?mq.removeEventListener('change',f):mq.removeListener(f)}},[]);
+ return m;
+}
+/* Barra de navegación inferior (móvil) */
+function TabBar({items,current,onSelect}){
+ return(<nav className="tabbar" aria-label="Navegación principal">{items.map(([k,ic,l])=>(
+  <button key={k} type="button" aria-current={current===k?'page':undefined} onClick={()=>onSelect(k)}><Icon n={ic} s={22}/><span>{l}</span></button>))}</nav>);
 }
 function Spinner(){return <Icon n="loader" s={18} cls="spin"/>}
 
@@ -471,14 +533,14 @@ function ConfirmHost(){
 }
 
 /* ---------- Cabecera ---------- */
-function Header({logo,user,sync,onOut,onHelp}){
+function Header({logo,user,sync,onOut,onHelp,hideOut}){
  const st={saving:['loader','Guardando…','spin'],ok:['cloud','Guardado en Sheets',''],err:['alert','Sin conexión','']}[sync];
  return(<header className="hdr"><div className="hdr-in">
   <Logo logo={logo} size={40}/>
   <div className="hdr-t"><p className="hdr-name">INTERCENTROS 10° EDICIÓN</p><p className="hdr-place">Plasencia 2027</p></div>
   {user&&<div className={'sync'+(sync==='err'?' err':'')} role="status" aria-live="polite"><Icon n={st[0]} s={18} cls={st[2]}/><span className="txt">{st[1]}</span></div>}
   <IconBtn icon="help" label="Abrir manual de usuario" onClick={onHelp}/>
-  {user&&<IconBtn icon="logout" label="Cerrar sesión" onClick={onOut}/>}
+  {user&&<IconBtn icon="logout" label="Cerrar sesión" onClick={onOut} cls={hideOut?'hide-m':''}/>}
  </div></header>);
 }
 
@@ -629,39 +691,70 @@ function Schedule({db,onEdit}){
  </section>))}</div>);
 }
 
-/* ---------- Juez: lista de disciplinas → formulario de posiciones ---------- */
+/* Hoja de posición: rejilla de números grande, pensada para el pulgar */
+function PositionSheet({db,center,n,pos,cat,left,onPick,onClear,onClose}){
+ const taken={};
+ Object.entries(pos).forEach(([cid,p])=>{if(cid!==center.id){const c=db.centers.find(x=>x.id===cid);(taken[p]=taken[p]||[]).push(c?c.name:'otro centro')}});
+ const cur=pos[center.id],free=Array.from({length:n},(_,k)=>k+1).find(q=>!taken[q]);
+ return(<Dialog labelId="ps-t" onClose={onClose}>
+  <div className="sheet-who"><Jersey color={center.color} size={44}/>
+   <div className="grow"><h2 id="ps-t" className="clamp2">{center.name}</h2><p className="hint">{cat} · {left} {left===1?'centro':'centros'} sin posición</p></div>
+   <IconBtn icon="x" label="Cerrar selector" onClick={onClose}/></div>
+  <div className="dlg-b" style={{paddingTop:16}}>
+   <p className="lbl">Elige su posición final</p>
+   <div className="pgrid">{Array.from({length:n},(_,i)=>i+1).map(p=>{const on=cur===p,t=taken[p];return(
+    <button key={p} type="button" className={'pbtn tnum'+(on?' on':'')+(t&&!on?' taken':'')} aria-pressed={on} data-autofocus={(cur?on:p===free)||undefined}
+     aria-label={p+'.º, '+ptsFor(n,p)+' puntos'+(t?'. Ya la tiene '+t.join(', '):'')} onClick={()=>onPick(p)}>
+     <span className="pn">{p}.º</span><span className="pp">{ptsFor(n,p)} pts</span></button>)})}</div>
+   <p className="hint">Las posiciones con borde discontinuo ya están asignadas. Elígelas solo si hay empate.</p>
+   <div className="dlg-actions">
+    {cur&&<button type="button" className="btn btn-danger" onClick={onClear}>Quitar posición</button>}
+    <button type="button" className="btn btn-secondary" onClick={onClose}>Cerrar</button>
+   </div>
+  </div>
+ </Dialog>);
+}
+
+/* ---------- Juez: lista de disciplinas → posiciones ---------- */
 function Judge({db,api,role,me,embedded}){
- const [ev,setEv]=useState(null);const [cat,setCat]=useState(null);const id=useId();
+ const [ev,setEv]=useState(null);const [cat,setCat]=useState(null);const [sheet,setSheet]=useState(null);const id=useId();
+ const mobile=useMobile(),tabs=mobile&&!embedded;const [mt,setMt]=useState('disc');
  const n=db.centers.length;
- const open=e=>{setEv(e);setCat(e.c[0]);window.scrollTo(0,0)};
+ const open=e=>{setEv(e);setCat(e.c[0]);setMt('disc');window.scrollTo(0,0)};
+ const pick=k=>{setMt(k);setEv(null);setSheet(null);window.scrollTo(0,0)};
+ const bar=tabs&&<TabBar items={[['disc','clipboard','Puntuar'],['rank','trophy','Clasificación'],['cal','calendar','Calendario']]} current={ev?'disc':mt} onSelect={pick}/>;
  const Wrap=embedded?'div':'main';const wp=embedded?{}:{id:'main',className:'page'};
  if(!ev){
   const next=EVENTS.find(e=>!evDone(db,e));
   const mine=EVENTS.filter(e=>judgesOf(db,e).includes(me));
+  const intro=db.settings.strictOrder&&role!=='admin'?(next?'Los resultados se registran en orden. Ahora toca '+next.n+'.':'Todas las disciplinas están completas.'):'Elige la disciplina para registrar las posiciones.';
+  const mineNote=role==='juez'&&mine.length>0&&<p className="notice notice-ok"><Icon n="userCheck" s={18}/><span><b style={{fontWeight:600}}>Tus disciplinas:</b> {mine.map(e=>e.n).join(', ')}</span></p>;
+  const discList=(<ul className="list" aria-label="Disciplinas">{EVENTS.map((e,i)=>{
+   const js=judgesOf(db,e),own=js.includes(me),open_=isOpen(db,i,role),mayJ=canJudge(db,e,role,me),ok=open_&&mayJ,done=evDone(db,e);
+   const started=keysOf(e).some(k=>Object.keys(db.scores[k]||{}).length);
+   return(<li key={e.id}><button type="button" className="row row-btn" disabled={!ok} onClick={()=>open(e)}>
+    <Mono e={e}/>
+    <div className="grow"><p className="row-name">{e.n}</p>
+     <div className="row-meta"><span>{e.c.map(c=>CAT[c]).join(' · ')}</span>
+      {done?<span className="st-ok"><Icon n="check" s={14}/>Completada</span>
+       :!mayJ?<span>Juez: {js.join(', ')}</span>
+       :!open_?<span>Pendiente de las anteriores</span>
+       :started?<span className="st-live"><Icon n="play" s={12}/>En juego</span>:null}
+      {own&&role==='juez'&&<span className="st-ok">Asignada a ti</span>}
+      {role!=='juez'&&js.length>0&&<span><Icon n="userCheck" s={14}/>{js.join(', ')}</span>}
+     </div></div>
+    <Icon n={ok?'chevR':'lock'} s={18} cls="muted"/>
+   </button></li>)})}</ul>);
+  if(tabs)return(<><main id="main" className="page stack">
+   {mt==='disc'&&<><div className="ph"><div><h1>Registro de resultados</h1><p>{intro}</p></div></div>{allDone(db)&&<Podium db={db}/>}{mineNote}{discList}</>}
+   {mt==='rank'&&<><div className="ph"><div><h1>Clasificación</h1><p>Puntos acumulados por cada centro. Se actualiza sola.</p></div></div>{allDone(db)&&<Podium db={db}/>}<Ranking db={db}/></>}
+   {mt==='cal'&&<><div className="ph"><div><h1>Calendario</h1><p>Horario y estado de cada prueba.</p></div></div><Schedule db={db}/></>}
+  </main>{bar}</>);
   return(<Wrap {...wp}><div className="stack">
-   <div className="ph"><div><h1>{embedded?'Puntuar':'Registro de resultados'}</h1>
-    <p>{db.settings.strictOrder&&role!=='admin'?(next?'Los resultados se registran en orden. Ahora toca '+next.n+'.':'Todas las disciplinas están completas.'):'Elige la disciplina para registrar las posiciones.'}</p></div></div>
-   {allDone(db)&&<Podium db={db}/>}
-   {role==='juez'&&mine.length>0&&<p className="notice notice-ok"><Icon n="userCheck" s={18}/><span><b style={{fontWeight:600}}>Tus disciplinas:</b> {mine.map(e=>e.n).join(', ')}</span></p>}
+   <div className="ph"><div><h1>{embedded?'Puntuar':'Registro de resultados'}</h1><p>{intro}</p></div></div>
+   {allDone(db)&&<Podium db={db}/>}{mineNote}
    <div className="cols cols-2">
-    <section aria-labelledby={id+'d'}><h2 id={id+'d'} className="sec-title">Disciplinas</h2>
-     <ul className="list">{EVENTS.map((e,i)=>{
-      const js=judgesOf(db,e),own=js.includes(me),open_=isOpen(db,i,role),mayJ=canJudge(db,e,role,me),ok=open_&&mayJ,done=evDone(db,e);
-      const started=keysOf(e).some(k=>Object.keys(db.scores[k]||{}).length);
-      return(<li key={e.id}><button type="button" className="row row-btn" disabled={!ok} onClick={()=>open(e)}>
-       <Mono e={e}/>
-       <div className="grow"><p className="row-name">{e.n}</p>
-        <div className="row-meta"><span>{e.c.map(c=>CAT[c]).join(' · ')}</span>
-         {done?<span className="st-ok"><Icon n="check" s={14}/>Completada</span>
-          :!mayJ?<span>Juez: {js.join(', ')}</span>
-          :!open_?<span>Pendiente de las anteriores</span>
-          :started?<span className="st-live"><Icon n="play" s={12}/>En juego</span>:null}
-         {own&&role==='juez'&&<span className="st-ok">Asignada a ti</span>}
-         {role!=='juez'&&js.length>0&&<span><Icon n="userCheck" s={14}/>{js.join(', ')}</span>}
-        </div></div>
-       <Icon n={ok?'chevR':'lock'} s={18} cls="muted"/>
-      </button></li>)})}</ul>
-    </section>
+    <section aria-labelledby={id+'d'}><h2 id={id+'d'} className="sec-title">Disciplinas</h2>{discList}</section>
     <section aria-labelledby={id+'r'}><h2 id={id+'r'} className="sec-title">Clasificación general</h2><Ranking db={db}/></section>
    </div>
    {!embedded&&<section aria-labelledby={id+'c'}><h2 id={id+'c'} className="sec-title">Calendario</h2><Schedule db={db}/></section>}
@@ -671,29 +764,37 @@ function Judge({db,api,role,me,embedded}){
  const setPos=(cid,v)=>{const m={...pos};if(!v)delete m[cid];else m[cid]=+v;api.scores(key,m)};
  const vals=Object.values(pos),dup=[...new Set(vals.filter((v,i)=>vals.indexOf(v)!==i))].sort((a,b)=>a-b);
  const nxt=EVENTS[EVENTS.indexOf(ev)+1];
- return(<Wrap {...(embedded?{}:{id:'main',className:'page page-narrow'})}><div className="stack">
-  <div><button type="button" className="btn btn-ghost" style={{marginLeft:-12}} onClick={()=>setEv(null)}><Icon n="chevL"/>Volver a disciplinas</button></div>
+ const missing=db.centers.filter(c=>!pos[c.id]);
+ // Al asignar por primera vez, salta al siguiente centro sin posición
+ const choose=(cid,p)=>{const first=!pos[cid];setPos(cid,p);
+  if(first){const after=db.centers.find(c=>c.id!==cid&&!pos[c.id]);setSheet(after?after.id:null)}else setSheet(null)};
+ const sc=sheet&&db.centers.find(c=>c.id===sheet);
+ return(<><Wrap {...(embedded?{}:{id:'main',className:'page page-narrow'})}><div className="stack">
+  <div><button type="button" className="btn btn-ghost" style={{marginLeft:-12}} onClick={()=>{setEv(null);setSheet(null)}}><Icon n="chevL"/>Volver a disciplinas</button></div>
   <div style={{display:'flex',alignItems:'center',gap:16}}><Mono e={ev} lg/><div className="grow"><h1 style={{fontSize:25}}>{ev.n}</h1>
-   <p className="hint">Elige la posición final de cada centro. Los puntos se calculan solos: 1.º = {n} pts, último = 1 pt.</p></div></div>
+   <p className="hint">Toca cada centro y elige su posición. Al asignar una, pasa solo al siguiente centro sin posición.</p></div></div>
   {ev.c.length>1&&<div className="seg" role="tablist" aria-label="Categoría">{ev.c.map(c=>{const ok=isComplete(db,ev.id+'-'+c);return(
-   <button key={c} type="button" role="tab" aria-selected={c===cat} onClick={()=>setCat(c)}>{ok&&<Icon n="check" s={16}/>}{CAT[c]}</button>)})}</div>}
+   <button key={c} type="button" role="tab" aria-selected={c===cat} onClick={()=>{setCat(c);setSheet(null)}}>{ok&&<Icon n="check" s={16}/>}{CAT[c]}</button>)})}</div>}
   <div><div className="bar" role="progressbar" aria-valuemin={0} aria-valuemax={n} aria-valuenow={vals.length} aria-label="Centros registrados"><span style={{width:(n?vals.length/n*100:0)+'%'}}/></div>
-   <p className="hint tnum" style={{marginTop:4}}>{vals.length} de {n} centros registrados en {CAT[cat]}</p></div>
+   <p className="hint tnum" style={{marginTop:4}}>{vals.length} de {n} centros registrados en {CAT[cat]} · 1.º = {n} pts, último = 1 pt</p></div>
   {dup.length>0&&<p className="notice notice-brand" role="status"><Icon n="alert" s={18}/>Hay posiciones repetidas ({dup.map(d=>d+'.º').join(', ')}). Corrígelas salvo que sea un empate real.</p>}
-  <ul className="list">{db.centers.map(c=>(<li key={c.id} className="row">
-   <Jersey color={c.color} size={36}/>
-   <label htmlFor={id+c.id} className="grow row-name clamp2">{c.name}</label>
-   <select id={id+c.id} className="input sel-pos tnum" value={pos[c.id]||''} onChange={e=>setPos(c.id,e.target.value)}>
-    <option value="">Sin posición</option>
-    {Array.from({length:n},(_,i)=>i+1).map(p=>(<option key={p} value={p}>{p}.º · {ptsFor(n,p)} pts</option>))}
-   </select></li>))}</ul>
+  {missing.length>0&&missing.length<n&&<div><button type="button" className="btn btn-secondary btn-block" onClick={()=>setSheet(missing[0].id)}>Continuar con {missing[0].name}</button></div>}
+  {missing.length===n&&n>0&&<div><button type="button" className="btn btn-primary btn-block" onClick={()=>setSheet(db.centers[0].id)}>Empezar a registrar posiciones</button></div>}
+  <ul className="list">{db.centers.map(c=>{const p=pos[c.id];return(<li key={c.id}>
+   <button type="button" className="row row-btn" onClick={()=>setSheet(c.id)} aria-label={c.name+': '+(p?p+'.º, '+ptsFor(n,p)+' puntos. Cambiar posición':'sin posición. Asignar posición')}>
+    <Jersey color={c.color} size={36}/><span className="grow row-name clamp2">{c.name}</span>
+    {p?<span className="pos-val tnum"><b>{p}.º</b><span>{ptsFor(n,p)} pts</span></span>:<span className="st-ok" style={{fontWeight:500,fontSize:14}}>Asignar</span>}
+    <Icon n="chevR" s={18} cls="muted"/>
+   </button></li>)})}</ul>
   {evDone(db,ev)&&<div className="notice notice-ok" style={{alignItems:'center',flexWrap:'wrap'}}>
    <Icon n="check" s={18}/><span className="grow">{ev.n} completada en todas las categorías.</span>
    {nxt?<button type="button" className="btn btn-primary" onClick={()=>open(nxt)}>Ir a {nxt.n}<Icon n="chevR"/></button>
-       :<button type="button" className="btn btn-primary" onClick={()=>setEv(null)}><Icon n="trophy"/>Ver podio final</button>}
+       :<button type="button" className="btn btn-primary" onClick={()=>{setEv(null);setMt('rank')}}><Icon n="trophy"/>Ver podio final</button>}
   </div>}
-  <section aria-labelledby={id+'g'}><h2 id={id+'g'} className="sec-title" style={{marginBottom:4}}>Clasificación general</h2><p className="hint" style={{marginBottom:12}}>En verde, los puntos que suma cada centro en esta prueba.</p><Ranking db={db} k={key}/></section>
- </div></Wrap>);
+  {!tabs&&<section aria-labelledby={id+'g'}><h2 id={id+'g'} className="sec-title" style={{marginBottom:4}}>Clasificación general</h2><p className="hint" style={{marginBottom:12}}>En verde, los puntos que suma cada centro en esta prueba.</p><Ranking db={db} k={key}/></section>}
+ </div></Wrap>
+ {sc&&<PositionSheet key={sc.id+cat} db={db} center={sc} n={n} pos={pos} cat={CAT[cat]} left={missing.filter(c=>c.id!==sc.id).length+(pos[sc.id]?0:1)} onPick={p=>choose(sc.id,p)} onClear={()=>{setPos(sc.id,'');setSheet(null)}} onClose={()=>setSheet(null)}/>}
+ {bar}</>);
 }
 
 /* ---------- Proyección (patrón Panel · pantalla completa) ---------- */
@@ -738,15 +839,17 @@ const NAV={calendario:['calendar','Calendario'],centros:['users','Centros'],juec
 function SectionHead({title,desc,children}){
  return(<div className="ph"><div><h1>{title}</h1>{desc&&<p>{desc}</p>}</div>{children&&<div className="ph-a">{children}</div>}</div>);
 }
-function Admin({db,api,server,role='admin',toast}){
+function Admin({db,api,server,role='admin',toast,onLogout}){
  const isAdmin=role==='admin';
  const keys=isAdmin?['calendario','centros','jueces','asignacion','puntuar','ranking','proyeccion','organizacion','logo','ajustes']:['calendario','centros','jueces','asignacion','ranking','proyeccion'];
- const [tab,setTab]=useState('calendario');const [projecting,setProjecting]=useState(false);
+ const prim=isAdmin?['puntuar','ranking','calendario']:['calendario','centros','ranking'];
+ const mobile=useMobile();
+ const [tab,setTab]=useState(isAdmin&&mobile?'puntuar':'calendario');const [projecting,setProjecting]=useState(false);const [more,setMore]=useState(false);
  const go=k=>{setTab(k);window.scrollTo(0,0)};
  return(<div className="shell">
-  <nav aria-label="Secciones"><p className="nav-role">{isAdmin?'Administración':'Organización'}</p>
+  {!mobile&&<nav aria-label="Secciones"><p className="nav-role">{isAdmin?'Administración':'Organización'}</p>
    <div className="nav">{keys.map(k=>(<button key={k} type="button" aria-current={tab===k?'page':undefined} onClick={()=>go(k)}><Icon n={NAV[k][0]} s={18}/>{NAV[k][1]}</button>))}</div>
-  </nav>
+  </nav>}
   <main id="main" className="shell-main stack">
    {!isAdmin&&<p className="notice notice-brand"><Icon n="info" s={18}/>Panel de organización: puedes añadir y editar actividades, centros y jueces. Para eliminar algo, pídeselo al administrador.</p>}
    {projecting&&<Projection db={db} onExit={()=>setProjecting(false)}/>}
@@ -766,7 +869,7 @@ function Admin({db,api,server,role='admin',toast}){
     <SectionHead title="Proyección" desc="Pantalla completa con el podio y la clasificación para proyectar en el evento. Se actualiza sola con cada resultado."/>
     <section className="card stack-sm">
      <p className={'notice '+(allDone(db)?'notice-ok':'notice-brand')}><Icon n={allDone(db)?'check':'info'} s={18}/>{allDone(db)?'Todas las pruebas han finalizado: se mostrarán los resultados finales.':'Aún quedan pruebas: se mostrará la clasificación provisional.'}</p>
-     <p className="hint">Durante la proyección, «Revelar podio» descubre el 3.º, el 2.º y el 1.º uno a uno. También puedes usar <kbd>Espacio</kbd> o <kbd>→</kbd>, y <kbd>Esc</kbd> para cerrar.</p>
+     <p className="hint">Durante la proyección, «Revelar podio» descubre el 3.º, el 2.º y el 1.º uno a uno. Con teclado: <kbd>Espacio</kbd> o <kbd>→</kbd>, y <kbd>Esc</kbd> para cerrar.</p>
      <div><button type="button" className="btn btn-primary" onClick={()=>setProjecting(true)}><Icon n="expand"/>Proyectar resultados</button></div>
     </section>
    </div>}
@@ -775,6 +878,16 @@ function Admin({db,api,server,role='admin',toast}){
    {tab==='logo'&&<LogoEditor db={db} api={api} toast={toast}/>}
    {tab==='ajustes'&&<Settings db={db} api={api} server={server}/>}
   </main>
+  {mobile&&<TabBar items={[...prim.map(k=>[k,NAV[k][0],NAV[k][1]]),['mas','more','Más']]} current={prim.includes(tab)?tab:'mas'} onSelect={k=>k==='mas'?setMore(true):go(k)}/>}
+  {more&&<Dialog labelId="more-t" onClose={()=>setMore(false)}>
+   <div className="dlg-h"><h2 id="more-t">{isAdmin?'Administración':'Organización'}</h2><IconBtn icon="x" label="Cerrar menú" onClick={()=>setMore(false)}/></div>
+   <ul style={{listStyle:'none',margin:0,padding:'8px 0'}}>
+    {keys.filter(k=>!prim.includes(k)).map(k=>(<li key={k}><button type="button" className="row row-btn" aria-current={tab===k?'page':undefined} onClick={()=>{setMore(false);go(k)}}>
+     <span className={'mono'+(tab===k?'':' alt')}><Icon n={NAV[k][0]} s={18}/></span><span className="grow row-name">{NAV[k][1]}</span><Icon n="chevR" s={18} cls="muted"/></button></li>))}
+    <li style={{borderTop:'1px solid var(--border)',marginTop:8,paddingTop:8}}><button type="button" className="row row-btn" onClick={()=>{setMore(false);onLogout()}}>
+     <span className="mono alt"><Icon n="logout" s={18}/></span><span className="grow row-name" style={{color:'var(--danger)'}}>Cerrar sesión</span></button></li>
+   </ul>
+  </Dialog>}
  </div>);
 }
 
@@ -789,26 +902,24 @@ function CalendarEditor({db,api,canDelete=true}){
   <SectionHead title="Calendario" desc="Horario del torneo. Los cambios se ven al momento en todos los dispositivos."><button type="button" className="btn btn-primary" onClick={add}><Icon n="plus"/>Añadir actividad</button></SectionHead>
   <section className="card"><div style={{display:'flex',flexWrap:'wrap',alignItems:'flex-end',gap:12}}>
    <div style={{flex:'1 1 220px'}}><Field id={id+'day'} label="Fecha del torneo" error={dErr}><input id={id+'day'} type="date" className="input" value={day} onChange={e=>{setDay(e.target.value);setDErr('')}} aria-invalid={!!dErr}/></Field></div>
-   <button type="button" className="btn btn-secondary" onClick={()=>{if(!day)return setDErr('Elige una fecha para aplicarla.');api.calendar(rows.map(r=>({...r,date:day})))}}>Aplicar fecha a todas las filas</button>
+   <button type="button" className="btn btn-secondary" style={{flex:'1 1 auto'}} onClick={()=>{if(!day)return setDErr('Elige una fecha para aplicarla.');api.calendar(rows.map(r=>({...r,date:day})))}}>Aplicar fecha a todas las filas</button>
   </div></section>
   {!rows.length?<Schedule db={db} onEdit={add}/>:
-  <ol className="list">{rows.map((r,i)=>{const ev=EVENTS.find(e=>e.id===r.id),p=id+'r'+i;return(<li key={i} className="row-edit">
-   {ev?<Mono e={ev}/>:<span className="mono alt" aria-hidden="true"><Icon n="coffee" s={18}/></span>}
-   <div className="grow stack-sm">
-    {ev?<p className="row-name" style={{paddingTop:8}}>{ev.n} <span className="muted" style={{fontWeight:400}}>· {CAT[r.cat]||r.cat}</span></p>
-     :<Field id={p+'n'} label="Actividad"><input id={p+'n'} className="input" value={r.name} onChange={e=>set(i,{name:e.target.value})}/></Field>}
-    <div className="fgrid four">
-     <Field id={p+'d'} label="Fecha"><input id={p+'d'} type="date" className="input" value={r.date} onChange={e=>set(i,{date:e.target.value})}/></Field>
-     <Field id={p+'s'} label="Inicio"><input id={p+'s'} type="time" className="input" value={r.start} onChange={e=>set(i,{start:e.target.value})}/></Field>
-     <Field id={p+'e'} label="Fin"><input id={p+'e'} type="time" className="input" value={r.end} onChange={e=>set(i,{end:e.target.value})}/></Field>
-     <div className="full"><Field id={p+'l'} label="Lugar"><input id={p+'l'} className="input" value={r.place} onChange={e=>set(i,{place:e.target.value})} placeholder="Pabellón"/></Field></div>
-    </div>
-   </div>
-   <div style={{display:'flex',flexDirection:'column'}}>
+  <ol className="list">{rows.map((r,i)=>{const ev=EVENTS.find(e=>e.id===r.id),p=id+'r'+i;return(<li key={i} className="re">
+   <div className="re-head">
+    {ev?<Mono e={ev}/>:<span className="mono alt" aria-hidden="true"><Icon n="coffee" s={18}/></span>}
+    <p className="grow row-name clamp2">{ev?ev.n:(r.name||'Actividad sin nombre')}{ev&&<span className="muted" style={{fontWeight:400}}> · {CAT[r.cat]||r.cat}</span>}</p>
     <IconBtn icon="up" label="Subir fila" onClick={()=>move(i,-1)}/>
     <IconBtn icon="down" label="Bajar fila" onClick={()=>move(i,1)}/>
     {canDelete&&<IconBtn icon="trash" label="Quitar del calendario" danger onClick={()=>del(i)}/>}
    </div>
+   <div className="re-body"><div className="fgrid four">
+    {!ev&&<div style={{gridColumn:'1/-1'}}><Field id={p+'n'} label="Actividad"><input id={p+'n'} className="input" value={r.name} onChange={e=>set(i,{name:e.target.value})}/></Field></div>}
+    <div className="full"><Field id={p+'d'} label="Fecha"><input id={p+'d'} type="date" className="input" value={r.date} onChange={e=>set(i,{date:e.target.value})}/></Field></div>
+    <Field id={p+'s'} label="Inicio"><input id={p+'s'} type="time" className="input" value={r.start} onChange={e=>set(i,{start:e.target.value})}/></Field>
+    <Field id={p+'e'} label="Fin"><input id={p+'e'} type="time" className="input" value={r.end} onChange={e=>set(i,{end:e.target.value})}/></Field>
+    <div className="full"><Field id={p+'l'} label="Lugar"><input id={p+'l'} className="input" value={r.place} onChange={e=>set(i,{place:e.target.value})} placeholder="Pabellón"/></Field></div>
+   </div></div>
   </li>)})}</ol>}
  </div>);
 }
@@ -819,20 +930,21 @@ function CentersEditor({db,api,isAdmin}){
  const add=()=>{const k=db.centers.length+1;api.centers([...db.centers,{id:'c'+Date.now(),name:'Centro '+k,color:COLORS[k%COLORS.length],user:'centro'+k,pass:'1234'}])};
  const del=async c=>{if(await ask({title:'¿Eliminar el centro «'+c.name+'»?',body:'Desaparecerá de la clasificación. Sus puntuaciones se conservan en la hoja.',ok:'Eliminar centro',danger:true}))api.centers(db.centers.filter(x=>x.id!==c.id))};
  return(<div className="stack">
-  <SectionHead title="Centros" desc="Centros participantes, color de su camiseta y acceso para consultar resultados.">
+  <SectionHead title="Centros" desc="Centros participantes y su acceso para consultar resultados. Toca una camiseta para cambiar su color.">
    {isAdmin&&<button type="button" className="btn btn-secondary" onClick={()=>api.settings({centersReady:false})}>Abrir asistente</button>}
    <button type="button" className="btn btn-primary" onClick={add}><Icon n="plus"/>Añadir centro</button>
   </SectionHead>
   {!db.centers.length?<div className="list"><div className="empty"><h2>Aún no hay centros</h2><p>Añade los centros participantes para empezar a puntuar.</p><button type="button" className="btn btn-primary" onClick={add}><Icon n="plus"/>Añadir centro</button></div></div>:
-  <ul className="list">{db.centers.map(c=>{const p=id+c.id;return(<li key={c.id} className="row-edit">
-   <Jersey color={c.color} size={48}/>
-   <div className="fgrid four">
-    <div className="full"><Field id={p+'n'} label="Nombre"><input id={p+'n'} className="input" value={c.name} onChange={e=>upd(c.id,{name:e.target.value})}/></Field></div>
-    <div className="field"><label htmlFor={p+'c'}>Camiseta</label><input id={p+'c'} type="color" className="swatch" value={c.color} onChange={e=>upd(c.id,{color:e.target.value})}/></div>
-    <Field id={p+'u'} label="Usuario"><input id={p+'u'} className="input" value={c.user} onChange={e=>upd(c.id,{user:e.target.value})} autoCapitalize="none"/></Field>
-    <Field id={p+'p'} label="Contraseña"><input id={p+'p'} className="input" value={c.pass} onChange={e=>upd(c.id,{pass:e.target.value})} autoCapitalize="none"/></Field>
+  <ul className="list">{db.centers.map(c=>{const p=id+c.id;return(<li key={c.id} className="re">
+   <div className="re-head" style={{alignItems:'flex-end'}}>
+    <label className="jersey-pick"><Jersey color={c.color} size={48}/><span className="sr-only">Color de la camiseta de {c.name}</span><input type="color" value={c.color} onChange={e=>upd(c.id,{color:e.target.value})}/></label>
+    <div className="grow"><Field id={p+'n'} label="Nombre"><input id={p+'n'} className="input" value={c.name} onChange={e=>upd(c.id,{name:e.target.value})}/></Field></div>
+    {isAdmin&&<IconBtn icon="trash" label="Eliminar centro" danger onClick={()=>del(c)}/>}
    </div>
-   {isAdmin&&<IconBtn icon="trash" label="Eliminar centro" danger onClick={()=>del(c)}/>}
+   <div className="re-body"><div className="fgrid">
+    <Field id={p+'u'} label="Usuario"><input id={p+'u'} className="input" value={c.user} onChange={e=>upd(c.id,{user:e.target.value})} autoCapitalize="none" autoCorrect="off"/></Field>
+    <Field id={p+'p'} label="Contraseña"><input id={p+'p'} className="input" value={c.pass} onChange={e=>upd(c.id,{pass:e.target.value})} autoCapitalize="none" autoCorrect="off"/></Field>
+   </div></div>
   </li>)})}</ul>}
  </div>);
 }
@@ -844,13 +956,15 @@ function PeopleEditor({title,desc,icon,noun,list,onChange,canDelete,make}){
  return(<div className="stack">
   <SectionHead title={title} desc={desc}><button type="button" className="btn btn-primary" onClick={add}><Icon n="plus"/>Añadir {noun}</button></SectionHead>
   {!list.length?<div className="list"><div className="empty"><h2>Aún no hay ningún {noun}</h2><p>Crea el primero y entrégale su usuario, su contraseña y el enlace de acceso.</p><button type="button" className="btn btn-primary" onClick={add}><Icon n="plus"/>Añadir {noun}</button></div></div>:
-  <ul className="list">{list.map((x,i)=>{const p=id+i;return(<li key={i} className="row-edit">
-   <span className="mono" aria-hidden="true"><Icon n={icon} s={18}/></span>
-   <div className="fgrid">
-    <Field id={p+'u'} label="Usuario"><input id={p+'u'} className="input" value={x.user} onChange={e=>onChange(list.map((y,k)=>k===i?{...y,user:e.target.value}:y))} autoCapitalize="none"/></Field>
-    <Field id={p+'p'} label="Contraseña"><input id={p+'p'} className="input" value={x.pass} onChange={e=>onChange(list.map((y,k)=>k===i?{...y,pass:e.target.value}:y))} autoCapitalize="none"/></Field>
+  <ul className="list">{list.map((x,i)=>{const p=id+i;return(<li key={i} className="re">
+   <div className="re-head" style={{alignItems:'flex-end'}}>
+    <span className="mono hide-m" aria-hidden="true" style={{marginBottom:2}}><Icon n={icon} s={18}/></span>
+    <div className="fgrid">
+     <Field id={p+'u'} label="Usuario"><input id={p+'u'} className="input" value={x.user} onChange={e=>onChange(list.map((y,k)=>k===i?{...y,user:e.target.value}:y))} autoCapitalize="none" autoCorrect="off"/></Field>
+     <Field id={p+'p'} label="Contraseña"><input id={p+'p'} className="input" value={x.pass} onChange={e=>onChange(list.map((y,k)=>k===i?{...y,pass:e.target.value}:y))} autoCapitalize="none" autoCorrect="off"/></Field>
+    </div>
+    {canDelete&&<IconBtn icon="trash" label={'Eliminar '+noun} danger onClick={()=>del(i)}/>}
    </div>
-   {canDelete&&<div style={{paddingTop:24}}><IconBtn icon="trash" label={'Eliminar '+noun} danger onClick={()=>del(i)}/></div>}
   </li>)})}</ul>}
  </div>);
 }
@@ -1008,15 +1122,22 @@ function CentersSetup({db,api,toast}){
 
 /* ---------- Vista del centro (patrón Panel) ---------- */
 function Centro({db,id}){
- const me=db.centers.find(c=>c.id===id);const u=useId();
+ const me=db.centers.find(c=>c.id===id);const u=useId();const mobile=useMobile();const [mt,setMt]=useState('rank');
+ const head=(<div style={{display:'flex',alignItems:'center',gap:16}}>{me&&<Jersey color={me.color} size={mobile?48:64}/>}<div className="ph grow"><div><h1>{me?me.name:'Tu centro'}</h1><p>Resultados en directo del torneo. Se actualizan solos.</p></div></div></div>);
+ const rank=<section aria-labelledby={u+'r'}><h2 id={u+'r'} className="sec-title">Clasificación general</h2><Ranking db={db} highlight={id}/></section>;
+ const det=<section aria-labelledby={u+'d'}><h2 id={u+'d'} className="sec-title">Tu rendimiento por disciplina</h2><Detail db={db} id={id}/></section>;
+ const cal=<section aria-labelledby={u+'c'}><h2 id={u+'c'} className="sec-title">Calendario</h2><Schedule db={db}/></section>;
+ if(mobile)return(<><main id="main" className="page stack">
+  {head}
+  {mt==='rank'&&<>{allDone(db)&&<Podium db={db}/>}{rank}</>}
+  {mt==='me'&&det}
+  {mt==='cal'&&cal}
+ </main><TabBar items={[['rank','trophy','Clasificación'],['me','users','Mi centro'],['cal','calendar','Calendario']]} current={mt} onSelect={k=>{setMt(k);window.scrollTo(0,0)}}/></>);
  return(<main id="main" className="page stack">
-  <div style={{display:'flex',alignItems:'center',gap:16}}>{me&&<Jersey color={me.color} size={64}/>}<div className="ph grow"><div><h1>{me?me.name:'Tu centro'}</h1><p>Resultados en directo del torneo. Se actualizan solos.</p></div></div></div>
+  {head}
   {allDone(db)&&<Podium db={db}/>}
-  <div className="cols cols-2">
-   <section aria-labelledby={u+'r'}><h2 id={u+'r'} className="sec-title">Clasificación general</h2><Ranking db={db} highlight={id}/></section>
-   <section aria-labelledby={u+'d'}><h2 id={u+'d'} className="sec-title">Tu rendimiento por disciplina</h2><Detail db={db} id={id}/></section>
-  </div>
-  <section aria-labelledby={u+'c'}><h2 id={u+'c'} className="sec-title">Calendario</h2><Schedule db={db}/></section>
+  <div className="cols cols-2">{rank}{det}</div>
+  {cal}
  </main>);
 }
 
@@ -1079,12 +1200,12 @@ function App(){
  const server={url:apiUrl,token:()=>tok.current,onSwitch:v=>{connected(v);setToast('Conectado al nuevo servidor de datos.')}};
  const logo=db?db.settings.logo:pub.logo;
  return(<LogoCtx.Provider value={logo}>
-  <Header logo={logo} user={user} sync={sync} onOut={()=>logout()} onHelp={()=>setHelp(true)}/>
+  <Header logo={logo} user={user} sync={sync} onOut={()=>logout()} onHelp={()=>setHelp(true)} hideOut={!!user&&!!db&&(user.role==='organizacion'||(user.role==='admin'&&db.settings.centersReady))}/>
   {boot?<BootSkeleton/>:<>
    {!apiUrl&&<Connect logo={logo} onDone={connected}/>}
    {apiUrl&&!user&&<Login logo={logo} onLogin={r=>{tok.current=r.token;tokSet(r.token);apply(r)}}/>}
-   {user&&db&&user.role==='admin'&&(db.settings.centersReady?<Admin db={db} api={api} server={server} toast={setToast}/>:<CentersSetup db={db} api={api} toast={setToast}/>)}
-   {user&&db&&user.role==='organizacion'&&<Admin db={db} api={api} server={server} role="organizacion" toast={setToast}/>}
+   {user&&db&&user.role==='admin'&&(db.settings.centersReady?<Admin db={db} api={api} server={server} toast={setToast} onLogout={()=>logout()}/>:<CentersSetup db={db} api={api} toast={setToast}/>)}
+   {user&&db&&user.role==='organizacion'&&<Admin db={db} api={api} server={server} role="organizacion" toast={setToast} onLogout={()=>logout()}/>}
    {user&&db&&user.role==='juez'&&<Judge db={db} api={api} role="juez" me={user.user}/>}
    {user&&db&&user.role==='centro'&&<Centro db={db} id={user.id}/>}
   </>}
