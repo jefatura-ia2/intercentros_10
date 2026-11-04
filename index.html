@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>INTERCENTROS 10° EDICIÓN</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com/3.4.17"></script>
+<script>tailwind.config={darkMode:'media',theme:{extend:{fontFamily:{sans:['Montserrat','system-ui','-apple-system','Segoe UI','Roboto','sans-serif']}}}}</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{font-family:Montserrat,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+@keyframes rise{from{opacity:0;transform:tranneutralY(24px)}to{opacity:1;transform:none}}
+.rise{animation:rise .6s ease-out both}
+@media (prefers-reduced-motion:reduce){.rise{animation:none}}
+.card{transition:transform .15s}.card:active{transform:scale(.96)}
+@media (prefers-reduced-motion:reduce){.card{transition:none}}
+</style>
+</head>
+<body class="bg-neutral-100 text-neutral-900 dark:bg-black dark:text-neutral-100 min-h-screen">
+<div id="root"></div>
+<script type="text/babel">
+const {useState,useEffect,useRef}=React;
+const EVENTS=[
+ {id:'f7',n:'Fútbol 7',i:'⚽',c:['M','F']},
+ {id:'vo',n:'Vóley',i:'🏐',c:['M','F']},
+ {id:'pa',n:'Pádel',i:'🎾',c:['M','F']},
+ {id:'ho',n:'Hockey',i:'🏑',c:['M','F']},
+ {id:'ba',n:'Bádminton',i:'🏸',c:['M','F']},
+ {id:'at',n:'Atletismo',i:'🏃',c:['M','F']},
+ {id:'es',n:'Escalada',i:'🧗',c:['M','F']},
+ {id:'da',n:'Datch-ball',i:'🎯',c:['Mixto']}
+];
+const CAT={M:'Masculino',F:'Femenino',Mixto:'Mixto'};
+const COLORS=['#dc2626','#2563eb','#16a34a','#eab308','#9333ea','#ea580c','#0891b2','#db2777','#65a30d','#0d9488','#4f46e5','#475569'];
+const TK='intercentros10_token';
+const API_KEY='intercentros10_api';
+const URL_RE=/^https:\/\/script\.google\.com\/(a\/macros\/[^/]+\/|macros\/)s\/[\w-]+\/exec$/;
+function apiGet(){try{return localStorage.getItem(API_KEY)||''}catch(e){return ''}}
+function apiSet(u){try{u?localStorage.setItem(API_KEY,u):localStorage.removeItem(API_KEY)}catch(e){}}
+
+/* ---------- Conexión con el servidor de datos (Apps Script + Google Sheets) ---------- */
+async function call(url,fn,...args){
+ let r,j;
+ try{r=await fetch(url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({fn,args})})}
+ catch(e){throw new Error('No hay conexión con el servidor de datos. Revisa internet y la URL.')}
+ try{j=await r.json()}
+ catch(e){throw new Error('La URL no responde como el servidor de Intercentros. Comprueba que la implementación tenga acceso «Cualquier usuario».')}
+ if(j&&j.error){const e=new Error(j.error);e.code=j.code;throw e}
+ return j;
+}
+function run(fn,...a){const u=apiGet();return u?call(u,fn,...a):Promise.reject(new Error('Falta la URL del servidor de datos.'))}
+
+/* Enlace de acceso (?api=...): solo configura dispositivos que aún no tienen servidor */
+let LINK_CONFLICT=false;
+(function(){
+ const q=new URLSearchParams(location.search),u=q.get('api');if(!u)return;
+ if(URL_RE.test(u)&&!apiGet())apiSet(u);else if(apiGet()&&u!==apiGet())LINK_CONFLICT=true;
+ q.delete('api');try{history.replaceState(null,'',location.pathname+(q.toString()?'?'+q:'')+location.hash)}catch(e){}
+})();
+
+/* Comprueba una URL nueva: debe ser un servidor de Intercentros y las credenciales de administrador */
+async function verifyAdmin(url,u,p){
+ url=url.trim();
+ if(!URL_RE.test(url))throw new Error('Pega la URL de la aplicación web de Apps Script: empieza por https://script.google.com/ y termina en /exec.');
+ const pub=await call(url,'getPublic');
+ if(!pub||pub.app!=='intercentros')throw new Error('Esa URL no corresponde a un servidor de Intercentros. ¿Has pegado el Code.gs actualizado?');
+ const r=await call(url,'login',u,p);
+ if(r.session.role!=='admin'){call(url,'logout',r.token).catch(()=>{});throw new Error('Solo el administrador puede conectar la app con la hoja de datos.')}
+ if(pub.moved)await call(url,'saveSettings',r.token,{movedTo:''});
+ return {url,pub:{...pub,moved:null},login:r};
+}
+
+function tokGet(){try{return localStorage.getItem(TK)}catch(e){return null}}
+function tokSet(t){try{t?localStorage.setItem(TK,t):localStorage.removeItem(TK)}catch(e){}}
+
+/* Cola de guardado: agrupa cambios rápidos y guarda en orden */
+const timers={},chains={},seq={},dirty=new Set();
+function queue(kind,call,onDone,onErr){
+ dirty.add(kind);const n=seq[kind]=(seq[kind]||0)+1;clearTimeout(timers[kind]);
+ timers[kind]=setTimeout(()=>{
+  chains[kind]=(chains[kind]||Promise.resolve()).then(call).then(
+   ()=>{if(seq[kind]===n){dirty.delete(kind);onDone()}},
+   e=>{if(seq[kind]===n)dirty.delete(kind);onErr(e)});
+ },700);
+}
+
+/* ---------- Lógica del torneo ---------- */
+const keysOf=e=>e.c.map(c=>e.id+'-'+c);
+const ptsFor=(n,pos)=>Math.max(0,n-pos+1);
+const isComplete=(db,k)=>{const m=db.scores[k]||{};return db.centers.length>0&&db.centers.every(c=>m[c.id])};
+const evDone=(db,e)=>keysOf(e).every(k=>isComplete(db,k));
+const isOpen=(db,i,role)=>role==='admin'||!db.settings.strictOrder||EVENTS.slice(0,i).every(e=>evDone(db,e));
+const allDone=db=>EVENTS.every(e=>evDone(db,e));
+function calc(db){
+ const n=db.centers.length,tot={},per={};
+ db.centers.forEach(c=>{tot[c.id]=0;per[c.id]={}});
+ Object.entries(db.scores).forEach(([k,m])=>Object.entries(m).forEach(([cid,pos])=>{
+  if(!per[cid])return;const p=ptsFor(n,+pos);per[cid][k]=p;tot[cid]+=p;
+ }));
+ return db.centers.map(c=>({...c,total:tot[c.id],per:per[c.id]})).sort((a,b)=>b.total-a.total);
+}
+
+/* ---------- Componentes ---------- */
+const LogoCtx=React.createContext(null);
+function Jersey({color,size=56}){
+ const logo=React.useContext(LogoCtx);
+ return(<svg width={size} height={size} viewBox="0 0 64 64" aria-hidden="true">
+  <path d="M20 6 L8 14 L2 26 L14 31 L14 58 L50 58 L50 31 L62 26 L56 14 L44 6 C42 11 37 13 32 13 C27 13 22 11 20 6Z" fill={color} stroke="#0f172a" strokeWidth="2" strokeLinejoin="round"/>
+  <path d="M24 6 C26 11 29 13 32 13 C35 13 38 11 40 6" fill="none" stroke="#fff" strokeOpacity=".7" strokeWidth="2"/>
+  {logo&&<image href={logo} x="20" y="20" width="24" height="24" preserveAspectRatio="xMidYMid meet"/>}
+ </svg>);
+}
+
+function compressLogo(f,cb){
+ if(!f)return;const r=new FileReader();
+ r.onload=()=>{const im=new Image();im.onload=()=>{let size=256,url='';
+  for(let t=0;t<6;t++){const s=Math.min(1,size/Math.max(im.width,im.height));const cv=document.createElement('canvas');cv.width=Math.max(1,Math.round(im.width*s));cv.height=Math.max(1,Math.round(im.height*s));cv.getContext('2d').drawImage(im,0,0,cv.width,cv.height);
+   url=cv.toDataURL('image/webp',.85);if(url.indexOf('image/webp')<0)url=cv.toDataURL('image/png');if(url.length<45000)break;size=Math.round(size*.7)}
+  if(url.length>=45000)return alert('El logotipo es demasiado pesado. Prueba con una imagen más sencilla.');cb(url)};
+  im.onerror=()=>alert('No se pudo leer la imagen.');im.src=r.result};
+ r.readAsDataURL(f);
+}
+
+function Logo({logo,cls='h-12'}){
+ return logo?<img src={logo} alt="Logotipo" className={cls+' w-auto object-contain rounded'}/>:<div className={cls+' aspect-square grid place-items-center rounded-full bg-green-500 text-xl'}>🏆</div>;
+}
+
+function Header({logo,user,onOut,sync}){
+ const lbl={saving:'⏳ Guardando…',ok:'☁️ Guardado en Sheets',err:'⚠️ Sin conexión'}[sync];
+ return(<header className="sticky top-0 z-10 bg-black text-white px-4 py-3 flex items-center gap-3 shadow border-b-4" style={{borderImage:'linear-gradient(90deg,#7e22ce,#16a34a) 1'}}>
+  <Logo logo={logo}/>
+  <h1 className="font-extrabold text-base sm:text-xl leading-tight flex-1">INTERCENTROS 10° EDICIÓN</h1>
+  {user&&<span className="text-xs opacity-90 hidden sm:inline">{lbl}</span>}
+  {user&&<button onClick={()=>onOut()} className="text-sm bg-white/20 hover:bg-white/30 rounded-lg px-3 py-2">Salir</button>}
+ </header>);
+}
+
+function Login({logo,onLogin}){
+ const [u,setU]=useState('');const [p,setP]=useState('');const [err,setErr]=useState('');const [busy,setBusy]=useState(false);
+ const go=()=>{if(busy)return;setBusy(true);setErr('');run('login',u,p).then(onLogin).catch(e=>setErr(e.message)).finally(()=>setBusy(false))};
+ return(<main className="max-w-sm mx-auto p-4 mt-8">
+  <div className="bg-white dark:bg-neutral-900 rounded-2xl shadow p-6 space-y-4">
+   <div className="flex justify-center"><Logo logo={logo} cls="h-20"/></div>
+   <h2 className="text-center text-xl font-bold">Acceso</h2>
+   <label className="block text-sm font-medium">Usuario
+    <input className="mt-1 w-full rounded-lg border p-3 bg-transparent" value={u} onChange={e=>setU(e.target.value)} autoCapitalize="none" autoComplete="username"/></label>
+   <label className="block text-sm font-medium">Contraseña
+    <input className="mt-1 w-full rounded-lg border p-3 bg-transparent" type="password" value={p} onChange={e=>setP(e.target.value)} onKeyDown={e=>e.key==='Enter'&&go()} autoComplete="current-password"/></label>
+   {err&&<p className="text-red-600 text-sm" role="alert">{err}</p>}
+   <button onClick={go} disabled={busy} className="w-full bg-purple-600 hover:bg-purple-700 disabled:opacity-60 text-white font-semibold rounded-lg p-3">{busy?'Entrando…':'Entrar'}</button>
+  </div>
+ </main>);
+}
+
+function Connect({logo,onDone}){
+ const [url,setUrl]=useState('');const [u,setU]=useState('');const [p,setP]=useState('');
+ const [err,setErr]=useState('');const [busy,setBusy]=useState(false);
+ const go=async()=>{if(busy)return;setBusy(true);setErr('');
+  try{const v=await verifyAdmin(url,u,p);apiSet(v.url);onDone(v)}catch(e){setErr(e.message)}finally{setBusy(false)}};
+ const inp='mt-1 w-full rounded-lg border p-3 bg-transparent';
+ return(<main className="max-w-md mx-auto p-4 mt-6 space-y-4">
+  <div className="bg-white dark:bg-neutral-900 rounded-2xl shadow p-6 space-y-4">
+   <div className="flex justify-center"><Logo logo={logo} cls="h-16"/></div>
+   <div><h2 className="text-center text-xl font-bold">Primer acceso</h2>
+    <p className="text-sm text-neutral-500 text-center mt-1">Conecta la app con la hoja de Google donde se guardarán los datos del torneo.</p></div>
+   <label className="block text-sm font-medium">URL de la aplicación web de Apps Script
+    <input className={inp+' font-mono text-xs'} value={url} onChange={e=>setUrl(e.target.value)} placeholder="https://script.google.com/macros/s/…/exec" autoCapitalize="none" spellCheck="false" inputMode="url"/></label>
+   <label className="block text-sm font-medium">Usuario del administrador
+    <input className={inp} value={u} onChange={e=>setU(e.target.value)} autoCapitalize="none" autoComplete="username"/></label>
+   <label className="block text-sm font-medium">Contraseña del administrador
+    <input className={inp} type="password" value={p} onChange={e=>setP(e.target.value)} onKeyDown={e=>e.key==='Enter'&&go()} autoComplete="current-password"/></label>
+   {err&&<p className="text-red-600 text-sm" role="alert">{err}</p>}
+   <button onClick={go} disabled={busy} className="w-full bg-purple-600 hover:bg-purple-700 disabled:opacity-60 text-white font-semibold rounded-lg p-3">{busy?'Comprobando…':'Conectar y entrar'}</button>
+   <details className="text-sm text-neutral-600 dark:text-neutral-300">
+    <summary className="cursor-pointer font-medium">¿Dónde encuentro la URL?</summary>
+    <ol className="list-decimal pl-5 mt-2 space-y-1">
+     <li>En tu hoja de Google, abre Extensiones › Apps Script y pega el archivo Code.gs.</li>
+     <li>Ejecuta la función setup una vez y acepta los permisos.</li>
+     <li>Implementar › Nueva implementación › Aplicación web, con «Ejecutar como: yo» y «Quién tiene acceso: cualquier usuario».</li>
+     <li>Copia la URL de la aplicación web (termina en /exec) y pégala aquí.</li>
+    </ol>
+   </details>
+  </div>
+  <p className="text-sm text-center text-neutral-500">¿Eres juez o centro? Abre el enlace de acceso que te ha enviado el administrador.</p>
+ </main>);
+}
+
+function ServerSettings({server}){
+ const [nu,setNu]=useState('');const [u,setU]=useState('');const [p,setP]=useState('');
+ const [err,setErr]=useState('');const [busy,setBusy]=useState(false);const [copied,setCopied]=useState(false);
+ const qr=useRef(null);
+ const web=/^https?:$/.test(location.protocol);
+ const link=web?location.origin+location.pathname+'?api='+encodeURIComponent(server.url):'';
+ useEffect(()=>{if(!link||!qr.current||!window.QRCode)return;qr.current.innerHTML='';
+  new QRCode(qr.current,{text:link,width:168,height:168,correctLevel:QRCode.CorrectLevel.M})},[link]);
+ const copy=()=>{const done=()=>{setCopied(true);setTimeout(()=>setCopied(false),2000)};
+  if(navigator.clipboard)navigator.clipboard.writeText(link).then(done,()=>prompt('Copia el enlace:',link));else prompt('Copia el enlace:',link)};
+ const move=async()=>{if(busy)return;setErr('');
+  if(nu.trim()===server.url)return setErr('Esa ya es la URL actual.');
+  setBusy(true);
+  try{
+   const v=await verifyAdmin(nu,u,p);
+   if(!confirm('La app pasará a guardar los datos en el nuevo servidor. Los demás dispositivos cambiarán solos la próxima vez que se conecten. ¿Continuar?'))return;
+   try{await run('saveSettings',server.token(),{movedTo:v.url})}
+   catch(e){if(!confirm('No se pudo avisar al servidor actual ('+e.message+'). Los demás dispositivos tendrán que abrir el nuevo enlace de acceso. ¿Cambiar igualmente en este dispositivo?'))return}
+   apiSet(v.url);server.onSwitch(v);
+  }catch(e){setErr(e.message)}finally{setBusy(false)}
+ };
+ const inp='rounded-lg border p-2 bg-transparent min-w-0 w-full';
+ return(<div className="bg-white dark:bg-neutral-900 rounded-xl p-4 shadow-sm space-y-4">
+  <div><h3 className="font-semibold">Servidor de datos</h3>
+   <p className="text-xs text-neutral-500 mt-1">Todos los dispositivos guardan y leen en esta aplicación web de Apps Script.</p>
+   <p className="font-mono text-xs break-all mt-2 rounded bg-neutral-100 dark:bg-black p-2">{server.url}</p></div>
+  <div className="space-y-2"><h4 className="font-medium text-sm">Enlace de acceso para jueces y centros</h4>
+   {link?<>
+    <div className="flex flex-wrap items-center gap-4"><div ref={qr} className="bg-white p-2 rounded" aria-label="Código QR del enlace de acceso"/>
+     <button onClick={copy} className="bg-purple-600 text-white rounded-lg px-4 py-2 text-sm">{copied?'Enlace copiado':'Copiar enlace'}</button></div>
+    <p className="text-xs text-neutral-500">Al abrirlo, cada dispositivo queda conectado a este servidor sin tener que escribir la URL.</p>
+   </>:<p className="text-xs text-purple-700 dark:text-purple-300">Has abierto la app como archivo local. Para compartir un enlace o un QR, publícala en una web (por ejemplo, GitHub Pages).</p>}
+  </div>
+  <div className="space-y-2 border-t pt-4 border-neutral-200 dark:border-neutral-700"><h4 className="font-medium text-sm">Cambiar de servidor</h4>
+   <p className="text-xs text-neutral-500">Úsalo solo si quieres guardar los datos en otra hoja. Necesitas el usuario y la contraseña de administrador de ese nuevo servidor.</p>
+   <input value={nu} onChange={e=>setNu(e.target.value)} placeholder="https://script.google.com/macros/s/…/exec" aria-label="Nueva URL del servidor" className={inp+' font-mono text-xs'} autoCapitalize="none" spellCheck="false"/>
+   <div className="grid grid-cols-2 gap-2">
+    <input value={u} onChange={e=>setU(e.target.value)} placeholder="Usuario admin" aria-label="Usuario admin del nuevo servidor" className={inp} autoCapitalize="none"/>
+    <input type="password" value={p} onChange={e=>setP(e.target.value)} placeholder="Contraseña admin" aria-label="Contraseña admin del nuevo servidor" className={inp}/>
+   </div>
+   {err&&<p className="text-red-600 text-sm" role="alert">{err}</p>}
+   <button onClick={move} disabled={busy||!nu} className="bg-red-600 disabled:opacity-50 text-white rounded-lg px-4 py-2 text-sm">{busy?'Comprobando…':'Trasladar al nuevo servidor'}</button>
+  </div>
+ </div>);
+}
+
+function Projection({db,onExit}){
+ const r=calc(db),done=allDone(db);
+ const total=EVENTS.reduce((a,e)=>a+e.c.length,0),fin=EVENTS.reduce((a,e)=>a+e.c.filter(c=>isComplete(db,e.id+'-'+c)).length,0);
+ const [shown,setShown]=useState(3); // 3 = podio visible; 0–2 = revelación en curso
+ const ref=useRef(null);
+ useEffect(()=>{const el=ref.current;if(el&&el.requestFullscreen)el.requestFullscreen().catch(()=>{});
+  const k=e=>{if(e.key==='Escape')onExit();if(e.key===' '||e.key==='ArrowRight'){e.preventDefault();setShown(v=>Math.min(3,v+1))}};
+  window.addEventListener('keydown',k);
+  return()=>{window.removeEventListener('keydown',k);if(document.fullscreenElement)document.exitFullscreen().catch(()=>{})}},[]);
+ const top=[r[1],r[0],r[2]],place=[2,1,3],hgt=['h-[22vh]','h-[30vh]','h-[16vh]'],medal=['🥈','🥇','🥉'];
+ const visible=pl=>shown>=4-pl; // se revela 3º, luego 2º y por último 1º
+ return(<div ref={ref} className="fixed inset-0 z-50 bg-black text-white overflow-auto flex flex-col" style={{padding:'max(2vh, env(safe-area-inset-top,0px)) 3vw max(2vh, env(safe-area-inset-bottom,0px))'}}>
+  <div className="flex items-center gap-4 border-b-4 pb-3" style={{borderImage:'linear-gradient(90deg,#7e22ce,#16a34a) 1'}}>
+   <Logo logo={db.settings.logo} cls="h-[8vh]"/>
+   <div className="flex-1"><h1 className="font-black tracking-tight" style={{fontSize:'clamp(1.5rem,3.6vw,3.5rem)'}}>INTERCENTROS 10° EDICIÓN</h1>
+    <p className="font-semibold text-green-400" style={{fontSize:'clamp(.9rem,1.6vw,1.6rem)'}}>{done?'Resultados finales':'Clasificación provisional · '+fin+' de '+total+' pruebas'}</p></div>
+  </div>
+  <div className="flex-1 flex items-end justify-center gap-[2vw] pt-[3vh]">
+   {top.map((c,i)=>c&&(<div key={c.id} className="flex flex-col items-center w-[22vw] max-w-xs">
+    {visible(place[i])?<div className="rise flex flex-col items-center">
+     <Jersey color={c.color} size={Math.round(Math.min(window.innerWidth*.11,window.innerHeight*.16))}/>
+     <span className="font-extrabold text-center mt-2 leading-tight" style={{fontSize:'clamp(1rem,2.2vw,2.4rem)'}}>{c.name}</span>
+     <span className="font-bold text-green-400" style={{fontSize:'clamp(.9rem,1.8vw,2rem)'}}>{c.total} pts</span>
+    </div>:<span className="font-black text-purple-400" style={{fontSize:'clamp(2rem,6vw,6rem)'}}>?</span>}
+    <div className={hgt[i]+' w-full mt-3 rounded-t-2xl flex flex-col items-center justify-start pt-3 '+(place[i]===1?'bg-green-500':'bg-purple-700')}>
+     <span style={{fontSize:'clamp(1.8rem,4vw,4.5rem)'}}>{medal[i]}</span>
+     <span className="font-black" style={{fontSize:'clamp(1.4rem,3vw,3.5rem)'}}>{place[i]}º</span>
+    </div>
+   </div>))}
+  </div>
+  {r.length>3&&<ol className="grid gap-2 mt-[3vh]" style={{gridTemplateColumns:'repeat(auto-fill,minmax(min(100%,22rem),1fr))'}}>
+   {r.slice(3).map((c,i)=>(<li key={c.id} className="flex items-center gap-3 rounded-xl bg-neutral-900 border border-purple-900 px-3 py-2">
+    <span className="w-8 text-center font-black text-purple-400" style={{fontSize:'clamp(1rem,1.5vw,1.6rem)'}}>{i+4}</span>
+    <Jersey color={c.color} size={36}/>
+    <span className="flex-1 font-semibold truncate" style={{fontSize:'clamp(.9rem,1.3vw,1.4rem)'}}>{c.name}</span>
+    <span className="font-bold text-green-400" style={{fontSize:'clamp(.9rem,1.3vw,1.4rem)'}}>{c.total} pts</span>
+   </li>))}
+  </ol>}
+  <div className="fixed bottom-3 right-3 flex gap-2 opacity-40 hover:opacity-100 focus-within:opacity-100 transition-opacity">
+   {shown>=3?<button onClick={()=>setShown(0)} className="bg-purple-700 rounded-lg px-3 py-2 text-sm font-semibold">Revelar podio</button>
+            :<button onClick={()=>setShown(v=>v+1)} className="bg-green-600 rounded-lg px-3 py-2 text-sm font-semibold">Mostrar {['3º','2º','1º'][shown]} puesto</button>}
+   <button onClick={onExit} className="bg-neutral-800 rounded-lg px-3 py-2 text-sm font-semibold">Salir</button>
+  </div>
+ </div>);
+}
+
+function Podium({db}){
+ const r=calc(db).slice(0,3);if(r.length<3)return null;
+ const order=[r[1],r[0],r[2]],h=['h-20','h-28','h-16'],medal=['🥈','🥇','🥉'];
+ return(<section className="bg-white dark:bg-neutral-900 rounded-2xl shadow p-4">
+  <h2 className="text-lg font-bold text-center">Podio final</h2>
+  <div className="flex items-end justify-center gap-3 mt-3">
+   {order.map((c,i)=>(<div key={c.id} className="flex flex-col items-center w-24">
+    <Jersey color={c.color} size={48}/><span className="text-sm font-semibold text-center mt-1">{c.name}</span>
+    <span className="text-xs text-neutral-500">{c.total} pts</span>
+    <div className={h[i]+' w-full mt-1 rounded-t-lg grid place-items-center text-2xl '+(i===1?'bg-green-500':'bg-purple-600')}>{medal[i]}</div>
+   </div>))}
+  </div>
+ </section>);
+}
+
+function Ranking({db,highlight,k}){
+ const r=calc(db);
+ return(<div className="space-y-2">
+  {r.map((c,i)=>(<div key={c.id} className={'flex items-center gap-3 rounded-xl p-3 bg-white dark:bg-neutral-900 shadow-sm '+(c.id===highlight?'ring-2 ring-purple-500':'')}>
+   <span className="w-8 text-center font-bold text-lg">{['🥇','🥈','🥉'][i]||i+1}</span>
+   <Jersey color={c.color} size={40}/>
+   <span className="flex-1 font-medium">{c.name}</span>
+   {k&&c.per[k]!=null&&<span className="text-xs font-semibold rounded-full bg-green-100 text-green-800 px-2 py-1">+{c.per[k]}</span>}
+   <span className="font-extrabold text-purple-700 dark:text-purple-300">{c.total} pts</span>
+  </div>))}
+ </div>);
+}
+
+function Detail({db,id}){
+ const c=calc(db).find(x=>x.id===id);if(!c)return null;
+ const max=Math.max(1,db.centers.length);
+ return(<div className="bg-white dark:bg-neutral-900 rounded-xl p-4 shadow-sm space-y-2">
+  <div className="flex items-center gap-3"><Jersey color={c.color} size={64}/><div><p className="font-bold text-lg">{c.name}</p><p className="text-sm text-neutral-500">{c.total} puntos</p></div></div>
+  {EVENTS.flatMap(e=>e.c.map(k=>({k:e.id+'-'+k,l:e.i+' '+e.n+' ('+k+')'}))).map(x=>(
+   <div key={x.k}><div className="flex justify-between text-xs"><span>{x.l}</span><span>{c.per[x.k]||0}</span></div>
+   <div className="h-2 rounded bg-neutral-200 dark:bg-neutral-700"><div className="h-2 rounded" style={{width:((c.per[x.k]||0)/max*100)+'%',background:c.color}}/></div></div>))}
+ </div>);
+}
+
+function fmtDate(d){if(!d)return 'Fecha por definir';const t=new Date(d+'T12:00:00');return isNaN(t)?d:t.toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'})}
+
+function Schedule({db}){
+ const rows=db.calendar||[];
+ if(!rows.length)return <p className="text-sm text-neutral-500">El calendario aún está vacío. El administrador puede crearlo en la pestaña Calendario.</p>;
+ const groups=[];rows.forEach(r=>{const g=groups.find(x=>x.d===r.date);g?g.r.push(r):groups.push({d:r.date,r:[r]})});
+ return(<div className="space-y-4">{groups.map(g=>(<section key={g.d||'x'}>
+  <h3 className="font-semibold capitalize mb-2">{fmtDate(g.d)}</h3>
+  <ol className="space-y-2">{g.r.map((r,i)=>{
+   const ev=EVENTS.find(e=>e.id===r.id),k=r.id+'-'+r.cat,m=db.scores[k]||{};
+   const st=!ev?null:isComplete(db,k)?'Finalizada':Object.keys(m).length?'En juego':null;
+   return(<li key={i} className={'flex items-center gap-3 rounded-xl p-3 shadow-sm '+(ev?'bg-white dark:bg-neutral-900':'bg-green-50 dark:bg-green-950/40')}>
+    <span className="w-24 shrink-0 text-sm font-semibold tabular-nums">{r.start}{r.end?'–'+r.end:''}</span>
+    <span className="text-2xl" aria-hidden="true">{ev?ev.i:'🍖'}</span>
+    <span className="flex-1 min-w-0"><span className="font-medium">{ev?ev.n:r.name}</span>{ev&&<span className="text-neutral-500"> ({CAT[r.cat]||r.cat})</span>}
+     {r.place&&<span className="block text-xs text-neutral-500 truncate">{r.place}</span>}</span>
+    {st&&<span className={'text-xs rounded-full px-2 py-1 '+(st==='Finalizada'?'bg-green-100 text-green-800':'bg-purple-100 text-purple-900')}>{st}</span>}
+   </li>)})}</ol>
+ </section>))}</div>);
+}
+
+function Judge({db,api,role}){
+ const [ev,setEv]=useState(null);const [cat,setCat]=useState(null);
+ const n=db.centers.length;
+ const open=e=>{setEv(e);setCat(e.c[0]);window.scrollTo(0,0)};
+ if(!ev){
+  const next=EVENTS.find(e=>!evDone(db,e));
+  return(<main className="p-4 max-w-3xl mx-auto">
+   {allDone(db)&&<div className="mb-4"><Podium db={db}/></div>}
+   <h2 className="text-lg font-bold mb-1">Disciplinas</h2>
+   {db.settings.strictOrder&&role!=='admin'&&<p className="text-sm text-neutral-500 mb-3">Los resultados se registran en orden. {next?'Ahora toca: '+next.i+' '+next.n+'.':'Todas las disciplinas están completas.'}</p>}
+   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+    {EVENTS.map((e,i)=>{const ok=isOpen(db,i,role);return(<button key={e.id} disabled={!ok} onClick={()=>open(e)} className={'card relative bg-white dark:bg-neutral-900 rounded-2xl shadow p-4 flex flex-col items-center gap-2 hover:ring-2 ring-purple-500 '+(ok?'':'opacity-50 cursor-not-allowed')}>
+     <span className="text-4xl">{e.i}</span><span className="font-semibold text-sm">{e.n}</span>
+     <span className="text-xs text-neutral-500">{e.c.join(' / ')}</span>
+     {evDone(db,e)?<span className="absolute top-2 right-2 text-green-600" aria-label="Completada">✔</span>:!ok&&<span className="absolute top-2 right-2" aria-label="Bloqueada">🔒</span>}
+    </button>)})}
+   </div>
+   <h2 className="text-lg font-bold mt-6 mb-2">Clasificación general</h2><Ranking db={db}/>
+   <h2 className="text-lg font-bold mt-6 mb-2">Calendario</h2><Schedule db={db}/>
+  </main>);
+ }
+ const key=ev.id+'-'+cat,pos=db.scores[key]||{};
+ const setPos=(cid,v)=>{const m={...pos};if(!v)delete m[cid];else m[cid]=+v;api.scores(key,m)};
+ const vals=Object.values(pos),dup=[...new Set(vals.filter((v,i)=>vals.indexOf(v)!==i))];
+ const idx=EVENTS.indexOf(ev),nxt=EVENTS[idx+1];
+ return(<main className="p-4 max-w-xl mx-auto space-y-3">
+  <button onClick={()=>setEv(null)} className="text-purple-600 dark:text-purple-300 text-sm">← Disciplinas</button>
+  <h2 className="text-xl font-bold">{ev.i} {ev.n}</h2>
+  <div className="flex gap-2">{ev.c.map(c=>(<button key={c} onClick={()=>setCat(c)} className={'flex-1 rounded-lg p-2 font-medium '+(c===cat?'bg-purple-600 text-white':'bg-white dark:bg-neutral-900')}>{CAT[c]}{isComplete(db,ev.id+'-'+c)?' ✔':''}</button>))}</div>
+  <p className="text-sm text-neutral-500">Elige la posición final de cada centro. Los puntos se calculan solos: 1º = {n} pts, último = 1 pt · {vals.length}/{n} registrados</p>
+  {dup.length>0&&<p className="text-sm rounded-lg bg-purple-100 text-purple-900 p-2">Posiciones repetidas: {dup.sort((a,b)=>a-b).map(d=>d+'º').join(', ')}. Corrígelas salvo que sea un empate.</p>}
+  {db.centers.map(c=>(<div key={c.id} className="flex items-center gap-3 bg-white dark:bg-neutral-900 rounded-xl p-3 shadow-sm">
+   <Jersey color={c.color} size={40}/><span className="flex-1">{c.name}</span>
+   <select value={pos[c.id]||''} onChange={e=>setPos(c.id,e.target.value)} aria-label={'Posición de '+c.name} className="w-32 text-center font-bold rounded-lg border p-2 bg-transparent dark:bg-neutral-900">
+    <option value="">Posición</option>
+    {Array.from({length:n},(_,i)=>i+1).map(p=>(<option key={p} value={p}>{p}º · {ptsFor(n,p)} pts</option>))}
+   </select></div>))}
+  {evDone(db,ev)&&<div className="rounded-xl bg-green-100 text-green-900 p-3 flex items-center gap-3">
+   <span className="flex-1 text-sm font-medium">{ev.n} completada.</span>
+   {nxt?<button onClick={()=>open(nxt)} className="bg-green-700 text-white rounded-lg px-3 py-2 text-sm">Siguiente: {nxt.i} {nxt.n}</button>
+       :<button onClick={()=>setEv(null)} className="bg-green-700 text-white rounded-lg px-3 py-2 text-sm">Ver podio final</button>}
+  </div>}
+  <h2 className="text-lg font-bold pt-4">Clasificación general <span className="text-xs font-normal text-neutral-500">(+ puntos de esta prueba)</span></h2><Ranking db={db} k={key}/>
+ </main>);
+}
+
+function Admin({db,api,server,role='admin'}){
+ const isAdmin=role==='admin';
+ const [tab,setTab]=useState('calendario');const [projecting,setProjecting]=useState(false);
+ const upd=(id,patch)=>api.centers(db.centers.map(c=>c.id===id?{...c,...patch}:c));
+ const add=()=>{const k=db.centers.length+1;api.centers([...db.centers,{id:'c'+Date.now(),name:'Centro '+k,color:COLORS[k%COLORS.length],user:'centro'+k,pass:'1234'}])};
+ const del=id=>{if(confirm('¿Eliminar este centro?'))api.centers(db.centers.filter(c=>c.id!==id))};
+ const onFile=e=>compressLogo(e.target.files[0],url=>api.settings({logo:url}));
+ const tabs=isAdmin
+  ?[['calendario','Calendario'],['centros','Centros'],['jueces','Jueces'],['puntuar','Puntuar'],['ranking','Clasificación'],['proyeccion','Proyección'],['organizacion','Organización'],['logo','Logotipo'],['ajustes','Ajustes']]
+  :[['calendario','Calendario'],['centros','Centros'],['jueces','Jueces'],['ranking','Clasificación'],['proyeccion','Proyección']];
+ return(<main className="p-4 max-w-3xl mx-auto space-y-4">
+  <div className="flex gap-2 overflow-x-auto pb-1">{tabs.map(([k,l])=>(<button key={k} onClick={()=>setTab(k)} className={'px-4 py-2 rounded-lg whitespace-nowrap '+(tab===k?'bg-purple-600 text-white':'bg-white dark:bg-neutral-900')}>{l}</button>))}</div>
+  {!isAdmin&&<p className="text-sm text-neutral-500">Panel de organización: puedes añadir y editar actividades, centros y jueces. Para eliminar algo, pídeselo al administrador.</p>}
+  {projecting&&<Projection db={db} onExit={()=>setProjecting(false)}/>}
+  {tab==='calendario'&&<CalendarEditor db={db} api={api} canDelete={isAdmin}/>}
+  {tab==='centros'&&<div className="space-y-3">
+   {isAdmin&&<button onClick={()=>api.settings({centersReady:false})} className="w-full bg-white dark:bg-neutral-900 rounded-lg p-3 font-medium shadow-sm">Abrir el asistente de centros y camisetas</button>}
+   {db.centers.map(c=>(<div key={c.id} className="bg-white dark:bg-neutral-900 rounded-xl p-3 shadow-sm space-y-2">
+    <div className="flex items-center gap-3"><Jersey color={c.color} size={48}/>
+     <input value={c.name} onChange={e=>upd(c.id,{name:e.target.value})} aria-label="Nombre del centro" className="flex-1 min-w-0 rounded-lg border p-2 bg-transparent"/>
+     <input type="color" value={c.color} onChange={e=>upd(c.id,{color:e.target.value})} className="w-11 h-11 rounded cursor-pointer" aria-label="Color de camiseta"/></div>
+    <div className="grid grid-cols-2 gap-2">
+     <input value={c.user} onChange={e=>upd(c.id,{user:e.target.value})} placeholder="Usuario" aria-label="Usuario" className="rounded-lg border p-2 bg-transparent min-w-0"/>
+     <input value={c.pass} onChange={e=>upd(c.id,{pass:e.target.value})} placeholder="Contraseña" aria-label="Contraseña" className="rounded-lg border p-2 bg-transparent min-w-0"/></div>
+    {isAdmin&&<button onClick={()=>del(c.id)} className="text-red-600 text-sm">Eliminar centro</button>}
+   </div>))}
+   <button onClick={add} className="w-full bg-green-600 text-white rounded-lg p-3 font-semibold">+ Añadir centro</button>
+  </div>}
+  {tab==='jueces'&&<div className="space-y-3">
+   <p className="text-sm text-neutral-500">Cada juez entra con su usuario y puede registrar resultados desde su móvil.</p>
+   {(db.judges||[]).map((j,i)=>(<div key={i} className="bg-white dark:bg-neutral-900 rounded-xl p-3 shadow-sm flex gap-2 items-center">
+    <span aria-hidden="true">🧑‍⚖️</span>
+    <input value={j.user} onChange={e=>api.judges(db.judges.map((x,k)=>k===i?{...x,user:e.target.value}:x))} placeholder="Usuario" aria-label="Usuario del juez" className="flex-1 min-w-0 rounded-lg border p-2 bg-transparent"/>
+    <input value={j.pass} onChange={e=>api.judges(db.judges.map((x,k)=>k===i?{...x,pass:e.target.value}:x))} placeholder="Contraseña" aria-label="Contraseña del juez" className="flex-1 min-w-0 rounded-lg border p-2 bg-transparent"/>
+    {isAdmin&&<button onClick={()=>confirm('¿Eliminar este juez?')&&api.judges(db.judges.filter((_,k)=>k!==i))} className="text-red-600 text-sm px-2" aria-label="Eliminar juez">✕</button>}
+   </div>))}
+   <button onClick={()=>api.judges([...(db.judges||[]),{user:'juez'+((db.judges||[]).length+1),pass:'juez123'}])} className="w-full bg-green-600 text-white rounded-lg p-3 font-semibold">+ Añadir juez</button>
+  </div>}
+  {tab==='puntuar'&&<Judge db={db} api={api} role="admin"/>}
+  {tab==='ranking'&&<div className="space-y-3">{allDone(db)&&<Podium db={db}/>}<Ranking db={db}/>
+   {isAdmin&&<button onClick={()=>confirm('¿Borrar todas las puntuaciones? También se borrarán de la hoja de Google.')&&api.reset()} className="text-red-600 text-sm">Reiniciar puntuaciones</button>}</div>}
+  {tab==='proyeccion'&&<div className="bg-black text-white rounded-2xl p-5 space-y-4 border-b-4" style={{borderImage:'linear-gradient(90deg,#7e22ce,#16a34a) 1'}}>
+   <div><h2 className="text-lg font-extrabold">Pantalla de resultados</h2>
+    <p className="text-sm text-neutral-300 mt-1">Abre a pantalla completa el podio y la clasificación para proyectarlos. Se actualiza sola con cada resultado. Con «Revelar podio» se muestran el 3º, el 2º y el 1º uno a uno (también con la barra espaciadora). Esc para salir.</p></div>
+   <p className="text-sm font-semibold text-green-400">{allDone(db)?'Todas las pruebas han finalizado: se mostrarán los resultados finales.':'Aún quedan pruebas: se mostrará la clasificación provisional.'}</p>
+   <button onClick={()=>setProjecting(true)} className="w-full bg-purple-700 hover:bg-purple-600 rounded-lg p-3 font-bold">Proyectar resultados</button>
+  </div>}
+  {tab==='organizacion'&&isAdmin&&<div className="space-y-3">
+   <p className="text-sm text-neutral-500">Los usuarios de organización pueden añadir y editar actividades, centros y jueces, y proyectar los resultados. No pueden eliminar datos, puntuar ni cambiar los ajustes.</p>
+   {(db.orgs||[]).map((o,i)=>(<div key={i} className="bg-white dark:bg-neutral-900 rounded-xl p-3 shadow-sm flex gap-2 items-center">
+    <span aria-hidden="true">🗂️</span>
+    <input value={o.user} onChange={e=>api.orgs(db.orgs.map((x,k)=>k===i?{...x,user:e.target.value}:x))} placeholder="Usuario" aria-label="Usuario de organización" className="flex-1 min-w-0 rounded-lg border p-2 bg-transparent"/>
+    <input value={o.pass} onChange={e=>api.orgs(db.orgs.map((x,k)=>k===i?{...x,pass:e.target.value}:x))} placeholder="Contraseña" aria-label="Contraseña de organización" className="flex-1 min-w-0 rounded-lg border p-2 bg-transparent"/>
+    <button onClick={()=>confirm('¿Eliminar este usuario de organización?')&&api.orgs(db.orgs.filter((_,k)=>k!==i))} className="text-red-600 text-sm px-2" aria-label="Eliminar usuario de organización">✕</button>
+   </div>))}
+   <button onClick={()=>api.orgs([...(db.orgs||[]),{user:'organizacion'+((db.orgs||[]).length+1),pass:'org123'}])} className="w-full bg-green-600 text-white rounded-lg p-3 font-semibold">+ Añadir usuario de organización</button>
+  </div>}
+  {tab==='logo'&&<div className="bg-white dark:bg-neutral-900 rounded-xl p-4 space-y-3">
+   <Logo logo={db.settings.logo} cls="h-24"/>
+   <input type="file" accept="image/*" onChange={onFile} className="block w-full text-sm" aria-label="Subir logotipo"/>
+   {db.settings.logo&&<button onClick={()=>api.settings({logo:''})} className="text-red-600 text-sm">Quitar logotipo</button>}
+  </div>}
+  {tab==='ajustes'&&<Settings db={db} api={api} server={server}/>}
+ </main>);
+}
+
+function CentersSetup({db,api}){
+ const blank=n=>/^Centro \d+$/.test(n)?'':n;
+ const [list,setList]=useState(()=>db.centers.map(c=>({...c,name:blank(c.name)})));
+ const [err,setErr]=useState('');
+ const upd=(i,p)=>{setErr('');setList(l=>l.map((c,k)=>k===i?{...c,...p}:c))};
+ const add=()=>setList(l=>{const k=l.length+1;return [...l,{id:'c'+Date.now(),name:'',color:COLORS[(k-1)%COLORS.length],user:'centro'+k,pass:'1234'}]});
+ const del=i=>setList(l=>l.filter((_,k)=>k!==i));
+ const sameColor=i=>list.find((c,k)=>k!==i&&c.color.toLowerCase()===list[i].color.toLowerCase());
+ const save=()=>{
+  const names=list.map(c=>c.name.trim());
+  if(list.length<2)return setErr('Añade al menos 2 centros participantes.');
+  if(names.some(n=>!n))return setErr('Escribe el nombre de cada centro participante.');
+  if(new Set(names.map(n=>n.toLowerCase())).size!==names.length)return setErr('Hay nombres de centro repetidos.');
+  api.centers(list.map(c=>({...c,name:c.name.trim()})));api.settings({centersReady:true});window.scrollTo(0,0);
+ };
+ return(<main className="p-4 max-w-2xl mx-auto space-y-4">
+  <div>
+   <h2 className="text-xl font-bold">Centros participantes</h2>
+   <p className="text-sm text-neutral-500 mt-1">Escribe el nombre de cada centro y elige el color de la camiseta que le ha correspondido. Podrás cambiarlo después en la pestaña Centros.</p>
+  </div>
+  <section className="bg-white dark:bg-neutral-900 rounded-xl p-4 shadow-sm flex items-center gap-4">
+   <Logo logo={db.settings.logo} cls="h-16"/>
+   <div className="flex-1 min-w-0">
+    <p className="font-medium">Logotipo del evento</p>
+    <p className="text-xs text-neutral-500 mb-2">Se imprime en la camiseta de cada centro.</p>
+    <input type="file" accept="image/*" onChange={e=>compressLogo(e.target.files[0],url=>api.settings({logo:url}))} className="block w-full text-sm" aria-label="Subir logotipo del evento"/>
+   </div>
+  </section>
+  <ol className="space-y-3">{list.map((c,i)=>{const dup=sameColor(i);return(<li key={c.id} className="bg-white dark:bg-neutral-900 rounded-xl p-3 shadow-sm">
+   <div className="flex items-center gap-3">
+    <span className="w-6 text-center font-bold text-neutral-500">{i+1}</span>
+    <Jersey color={c.color} size={64}/>
+    <div className="flex-1 min-w-0 space-y-2">
+     <input value={c.name} onChange={e=>upd(i,{name:e.target.value})} placeholder={'Nombre del centro '+(i+1)} aria-label={'Nombre del centro '+(i+1)} className="w-full rounded-lg border p-2 bg-transparent"/>
+     <label className="flex items-center gap-2 text-sm">Color de la camiseta
+      <input type="color" value={c.color} onChange={e=>upd(i,{color:e.target.value})} className="w-11 h-9 rounded cursor-pointer"/></label>
+    </div>
+    <button onClick={()=>del(i)} aria-label={'Quitar centro '+(i+1)} className="text-red-600 px-2 self-start">✕</button>
+   </div>
+   {dup&&<p className="text-xs text-purple-700 dark:text-purple-300 mt-2">Mismo color que {dup.name||'otro centro'}.</p>}
+  </li>)})}</ol>
+  <button onClick={add} className="w-full bg-white dark:bg-neutral-900 rounded-lg p-3 font-medium shadow-sm">+ Añadir centro</button>
+  {err&&<p className="text-red-600 text-sm" role="alert">{err}</p>}
+  <button onClick={save} className="w-full bg-purple-600 hover:bg-purple-700 text-white rounded-lg p-3 font-semibold">Guardar {list.length} centros y continuar</button>
+ </main>);
+}
+
+function CalendarEditor({db,api,canDelete=true}){
+ const rows=db.calendar||[];const [day,setDay]=useState('');
+ const set=(i,p)=>api.calendar(rows.map((r,k)=>k===i?{...r,...p}:r));
+ const move=(i,d)=>{const j=i+d;if(j<0||j>=rows.length)return;const a=[...rows];[a[i],a[j]]=[a[j],a[i]];api.calendar(a)};
+ const inp='rounded-lg border p-2 bg-transparent min-w-0';
+ return(<div className="space-y-3">
+  <div className="bg-white dark:bg-neutral-900 rounded-xl p-3 shadow-sm flex flex-wrap items-end gap-2">
+   <label className="text-sm font-medium flex-1">Fecha del torneo<input type="date" value={day} onChange={e=>setDay(e.target.value)} className={inp+' mt-1 w-full'}/></label>
+   <button disabled={!day} onClick={()=>api.calendar(rows.map(r=>({...r,date:day})))} className="bg-purple-600 disabled:opacity-50 text-white rounded-lg px-3 py-2 text-sm">Aplicar a todo el calendario</button>
+  </div>
+  {rows.map((r,i)=>{const ev=EVENTS.find(e=>e.id===r.id);return(<div key={i} className="bg-white dark:bg-neutral-900 rounded-xl p-3 shadow-sm space-y-2">
+   <div className="flex items-center gap-2">
+    <span className="text-xl" aria-hidden="true">{ev?ev.i:'🍖'}</span>
+    {ev?<span className="flex-1 font-medium">{ev.n} <span className="text-neutral-500">({CAT[r.cat]||r.cat})</span></span>
+       :<input value={r.name} onChange={e=>set(i,{name:e.target.value})} aria-label="Actividad" className={inp+' flex-1'}/>}
+    <button onClick={()=>move(i,-1)} aria-label="Subir" className="px-2">▲</button>
+    <button onClick={()=>move(i,1)} aria-label="Bajar" className="px-2">▼</button>
+    {canDelete&&<button onClick={()=>confirm('¿Quitar esta fila del calendario?')&&api.calendar(rows.filter((_,k)=>k!==i))} aria-label="Quitar fila" className="text-red-600 px-2">✕</button>}
+   </div>
+   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+    <input type="date" value={r.date} onChange={e=>set(i,{date:e.target.value})} aria-label="Fecha" className={inp}/>
+    <input type="time" value={r.start} onChange={e=>set(i,{start:e.target.value})} aria-label="Hora de inicio" className={inp}/>
+    <input type="time" value={r.end} onChange={e=>set(i,{end:e.target.value})} aria-label="Hora de fin" className={inp}/>
+    <input value={r.place} onChange={e=>set(i,{place:e.target.value})} placeholder="Lugar" aria-label="Lugar" className={inp}/>
+   </div>
+  </div>)})}
+  <button onClick={()=>api.calendar([...rows,{id:'',name:'Nueva actividad',cat:'',date:day||(rows[rows.length-1]||{}).date||'',start:'',end:'',place:''}])} className="w-full bg-green-600 text-white rounded-lg p-3 font-semibold">+ Añadir actividad, descanso o acto</button>
+ </div>);
+}
+
+function Settings({db,api,server}){
+ const [u,setU]=useState(db.admin?.user||'');const [p,setP]=useState(db.admin?.pass||'');
+ return(<div className="space-y-4">
+  <div className="bg-white dark:bg-neutral-900 rounded-xl p-4 shadow-sm space-y-2">
+   <label className="flex items-center gap-3"><input type="checkbox" checked={!!db.settings.strictOrder} onChange={e=>api.settings({strictOrder:e.target.checked})} className="w-5 h-5"/>
+    <span><span className="font-medium">Registro en orden estricto</span><span className="block text-sm text-neutral-500">Los jueces solo pueden puntuar una disciplina cuando las anteriores están completas.</span></span></label>
+  </div>
+  <div className="bg-white dark:bg-neutral-900 rounded-xl p-4 shadow-sm space-y-2">
+   <h3 className="font-semibold">Acceso del administrador</h3>
+   <div className="grid grid-cols-2 gap-2">
+    <input value={u} onChange={e=>setU(e.target.value)} aria-label="Usuario del administrador" className="rounded-lg border p-2 bg-transparent min-w-0"/>
+    <input value={p} onChange={e=>setP(e.target.value)} aria-label="Contraseña del administrador" className="rounded-lg border p-2 bg-transparent min-w-0"/>
+   </div>
+   <button onClick={()=>api.settings({adminUser:u,adminPass:p})} className="bg-purple-600 text-white rounded-lg px-4 py-2 text-sm">Guardar acceso</button>
+  </div>
+  <ServerSettings server={server}/>
+  {db.sheetUrl&&<a href={db.sheetUrl} target="_blank" rel="noopener" className="block text-center bg-green-700 text-white rounded-lg p-3 font-semibold">Abrir la hoja de Google</a>}
+ </div>);
+}
+
+function Centro({db,id}){
+ return(<main className="p-4 max-w-2xl mx-auto space-y-4">
+  {allDone(db)&&<Podium db={db}/>}
+  <h2 className="text-lg font-bold">Clasificación general</h2><Ranking db={db} highlight={id}/>
+  <h2 className="text-lg font-bold">Tu rendimiento por disciplina</h2><Detail db={db} id={id}/>
+  <h2 className="text-lg font-bold">Calendario</h2><Schedule db={db}/>
+ </main>);
+}
+
+function App(){
+ const [pub,setPub]=useState({logo:null});const [apiUrl,setApiUrl]=useState(apiGet());
+ const [db,setDb]=useState(null);const [user,setUser]=useState(null);
+ const [sync,setSync]=useState('ok');const [toast,setToast]=useState('');const [boot,setBoot]=useState(true);
+ const tok=useRef(tokGet()),ver=useRef(0);
+ const apply=r=>{ver.current=r.state.version;setDb(r.state);setUser(r.session)};
+ const logout=m=>{if(tok.current)run('logout',tok.current).catch(()=>{});tok.current=null;tokSet(null);setUser(null);setDb(null);ver.current=0;if(m)setToast(m)};
+ const moved=m=>{
+  if(!m||m===apiGet()||!URL_RE.test(m))return false;
+  apiSet(m);tok.current=null;tokSet(null);setUser(null);setDb(null);ver.current=0;setApiUrl(m);
+  setToast('El administrador ha trasladado los datos a un nuevo servidor. Vuelve a entrar.');return true;
+ };
+ const fail=e=>{if(e&&e.code==='session')return logout(e.message);setSync('err');setToast((e&&e.message)||'No se pudo guardar.');ver.current=0};
+ useEffect(()=>{if(LINK_CONFLICT)setToast('Este dispositivo ya está conectado a un servidor de datos. Solo el administrador puede cambiarlo desde Ajustes.')},[]);
+ useEffect(()=>{
+  if(!apiUrl){setBoot(false);return}
+  setBoot(true);
+  run('getPublic').then(p=>{if(!moved(p.moved))setPub(p)}).catch(()=>{});
+  if(tok.current&&!user)run('getState',tok.current,0).then(r=>{if(!moved(r.moved))apply(r)}).catch(()=>{tok.current=null;tokSet(null)}).finally(()=>setBoot(false));
+  else setBoot(false);
+ },[apiUrl]);
+ useEffect(()=>{ // trae los cambios hechos desde otros dispositivos
+  if(!user)return;
+  const t=setInterval(()=>{
+   if(dirty.size||document.hidden)return;
+   run('getState',tok.current,ver.current).then(r=>{setSync(s=>s==='err'?'ok':s);if(moved(r.moved)||r.unchanged||dirty.size)return;apply(r)})
+    .catch(e=>{if(e.code==='session')logout(e.message);else setSync('err')});
+  },8000);
+  return()=>clearInterval(t);
+ },[user]);
+ useEffect(()=>{if(!toast)return;const t=setTimeout(()=>setToast(''),5000);return()=>clearTimeout(t)},[toast]);
+ const done=()=>{if(!dirty.size)setSync('ok')};
+ const save=(kind,fn,...a)=>{setSync('saving');queue(kind,()=>run(fn,tok.current,...a),done,fail)};
+ const api={
+  scores:(k,m)=>{setDb(d=>({...d,scores:{...d.scores,[k]:m}}));save('scores:'+k,'saveScores',k,m)},
+  centers:l=>{setDb(d=>({...d,centers:l}));save('centers','saveCenters',l)},
+  judges:l=>{setDb(d=>({...d,judges:l}));save('judges','saveJudges',l)},
+  orgs:l=>{setDb(d=>({...d,orgs:l}));save('orgs','saveOrgs',l)},
+  calendar:l=>{setDb(d=>({...d,calendar:l}));save('calendar','saveCalendar',l)},
+  settings:p=>{
+   setDb(d=>({...d,settings:{...d.settings,...('logo' in p?{logo:p.logo||null}:{}),...('strictOrder' in p?{strictOrder:p.strictOrder}:{}),...('centersReady' in p?{centersReady:p.centersReady}:{})}}));
+   if('logo' in p)setPub(x=>({...x,logo:p.logo||null}));
+   save('settings:'+Object.keys(p).join(','),'saveSettings',p);
+  },
+  reset:()=>{setDb(d=>({...d,scores:{}}));save('reset','resetScores')}
+ };
+ const connected=v=>{tok.current=v.login.token;tokSet(v.login.token);ver.current=0;setPub(v.pub);apply(v.login);setApiUrl(v.url)};
+ const server={url:apiUrl,token:()=>tok.current,onSwitch:v=>{connected(v);setToast('Conectado al nuevo servidor de datos.')}};
+ const logo=db?db.settings.logo:pub.logo;
+ return(<LogoCtx.Provider value={logo}>
+  <Header logo={logo} user={user} sync={sync} onOut={()=>logout()}/>
+  {boot?<p className="text-center text-neutral-500 mt-12" role="status">Conectando con la hoja de Google…</p>:<>
+   {!apiUrl&&<Connect logo={logo} onDone={connected}/>}
+   {apiUrl&&!user&&<Login logo={logo} onLogin={r=>{tok.current=r.token;tokSet(r.token);apply(r)}}/>}
+   {user&&db&&user.role==='admin'&&(db.settings.centersReady?<Admin db={db} api={api} server={server}/>:<CentersSetup db={db} api={api}/>)}
+   {user&&db&&user.role==='organizacion'&&<Admin db={db} api={api} server={server} role="organizacion"/>}
+   {user&&db&&user.role==='juez'&&<Judge db={db} api={api} role="juez"/>}
+   {user&&db&&user.role==='centro'&&<Centro db={db} id={user.id}/>}
+  </>}
+  {toast&&<div role="status" className="fixed left-1/2 -tranneutral-x-1/2 z-20 max-w-sm w-[90%] rounded-xl bg-neutral-900 text-white text-sm p-3 shadow-lg" style={{bottom:'calc(1rem + env(safe-area-inset-bottom,0px))'}}>{toast}</div>}
+ </LogoCtx.Provider>);
+}
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
