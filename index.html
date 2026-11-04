@@ -292,7 +292,7 @@ const URL_RE=/^https:\/\/script\.google\.com\/(a\/macros\/[^/]+\/|macros\/)s\/[\
    Pega entre las comillas la URL /exec de tu Apps Script.
    Así cualquier equipo se conecta solo, sin pedirla.
    ============================================================ */
-const SERVIDOR='';
+const SERVIDOR='https://script.google.com/macros/s/AKfycbynG4t5VVN_XHBQgLoemzGsAQnBOoZEaPUeYDt_fZI6cFV3m_kpfYYeBTizTnOSNBljPA/exec';
 function apiStored(){try{return localStorage.getItem(API_KEY)||''}catch(e){return ''}}
 function apiGet(){return apiStored()||(URL_RE.test(SERVIDOR.trim())?SERVIDOR.trim():'')}
 function apiSet(u){try{u?localStorage.setItem(API_KEY,u):localStorage.removeItem(API_KEY)}catch(e){}}
